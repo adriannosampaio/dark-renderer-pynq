@@ -1,0 +1,11 @@
+{
+	"active_preset" : "default",
+	"edge" : {
+		"ip"   : "localhost",
+		"port" : 7502
+	},
+	"cloud" : {
+		"ip"   : "localhost",
+		"port" : 7501
+	} 
+}
