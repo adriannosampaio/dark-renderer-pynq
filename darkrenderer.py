@@ -4,30 +4,7 @@ import json
 import socket
 import struct
 import logging as log
-
-class Parser:
-    def __init__(self, *args, **kwargs):
-        import argparse
-
-        self.parser = argparse.ArgumentParser(
-            description='Request Ray-Triangle computations to the Fog.')
-
-        self.parser.add_argument(
-            '-f', 
-            type=str,
-            help='File containing the scene information')
-
-        self.parser.add_argument(
-            '-o', 
-            type=str,
-            help='Output file')
-
-        self.parser.add_argument(
-            '--mode', 
-            choices=['client', 'edge', 'master', 'node'],
-            help='File containing the ray geometric information')
-
-        self.args = self.parser.parse_args()
+from application.parser import Parser
 
 class Session:
 	def __init__(self, input_filename, output_filename):
@@ -83,7 +60,6 @@ class DarkRendererClient:
 		return msg
 
 	def run(self):
-		#try:
 		# connect to the edge node
 		self._connect()
 		# send the task size
@@ -96,11 +72,6 @@ class DarkRendererClient:
 		print(result)
 		with open(self.session.output_filename, 'w') as output_file:
 			output_file.write(result)
-
-
-		#except Exception as e:
-		#	print(e)
-		#finally:
 		self._cleanup()
 
 	def _receive_results(self):
@@ -148,7 +119,11 @@ class DarkRendererClient:
 
 
 def main():
-	log.basicConfig(level=log.INFO)
+	log.basicConfig(
+		level=log.DEBUG, 
+		format='%(levelname)s: [%(asctime)s] - %(message)s', 
+		datefmt='%d-%b-%y %H:%M:%S'
+	)
 	parser = Parser()
 	input_filename = parser.args.f
 	output_filename = parser.args.o
