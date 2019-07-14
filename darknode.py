@@ -18,7 +18,7 @@ class DarkRendererNode():
         self.addr = (ip, port)
         self.sock.bind(self.addr)
 
-        self.cpu_tracer = tracer.TracerARM()
+        self.cpu_tracer = tracer.TracerARM(use_cpp=True)
 
         # IP address of the cloud application
         # cloud_ip   = config['cloud']['ip']

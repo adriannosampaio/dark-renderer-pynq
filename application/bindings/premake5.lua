@@ -1,11 +1,11 @@
 
 workspace "DarkRendererBindings"
-   configurations { "x32", "x64"}
+   configurations { "x32", "x64", "ARM"}
 
 project "tests"
     kind "ConsoleApp"
     language "C++"
-    targetdir "../"
+    targetdir "tests/bin"
 
     filter "configurations:Debug"
         architecture "x64"
@@ -22,16 +22,18 @@ project "tests"
 project "tracer"
     kind "SharedLib"
     language "C++"
-    targetdir "../"
 
     buildoptions "-std=c++11"
 
+    conda_dir = os.getenv("CONDA_PREFIX")
+
     includedirs {
         "deps/pybind11/include", 
-        "C:/Users/adria/AppData/Local/Continuum/anaconda3/envs/addr_python/include"}
+        conda_dir .. "/include"
+    }
 
     libdirs {
-        "C:/Users/adria/AppData/Local/Continuum/anaconda3/envs/addr_python/libs"
+        conda_dir .. "/libs"
     }
 
     filter {"action:vs*"}
@@ -39,7 +41,17 @@ project "tracer"
 
     files { "binding.cpp", "tracer.cpp", "tracer.hpp"}
 
+    filter "configurations:x32"
+        targetdir "x32"
+        architecture "x86"
+        optimize "On"
+
     filter "configurations:x64"
+        targetdir "x64"
         architecture "x64"
-        defines { "NDEBUG" }
+        optimize "On"
+
+    filter "configurations:ARM"
+        targetdir "ARM"
+        architecture "ARM"
         optimize "On"

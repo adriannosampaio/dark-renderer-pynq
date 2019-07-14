@@ -13,7 +13,8 @@ class TracerARM(TracerPYNQ):
         use_multicore=False,
         use_fpga=False
     ):
-        self.use_cpp = False
+        print(use_cpp)
+        self.use_cpp = use_cpp
         self.use_fpga = False
         self.use_multicore = False
 
@@ -26,16 +27,33 @@ class TracerARM(TracerPYNQ):
             faster to pass the ids to the lower level method,
             but I'll change it later
         '''
-        intersects, ids = self._computeCPU(
-            np.array(rays), 
-            np.array(tris))
-        ids = list(map(lambda x : tri_ids[x], ids))
-        
+        intersects, ids = [], []
+        if self.use_cpp:
+            ids, intersects = self._computeCPP(
+                rays,
+                tri_ids,
+                tris)
+        else:
+            ids, intersects = self._computeCPU(
+                np.array(rays), 
+                np.array(tris))
+            intersects = intersects.tolist()
+            ids = list(map(lambda x : tri_ids[x], ids))
+
         return {
-            'intersections' : intersects.tolist(),
+            'intersections' : intersects,
             'triangles_hit' : ids
         } 
         
+    def _computeCPP(self, rays, tri_ids, tris):
+        import platform
+        platform = platform.architecture()[0]
+        if platform == '64bit':
+            import application.bindings.x64.tracer as cpp_tracer
+        else:
+            raise Exception('Platform not currently supported')
+        return cpp_tracer.compute(rays, tri_ids, tris)
+
     def _computeCPU(self, rays, triangles):
         ''' Compute the intersection of a set of rays against
             a set of triangles
@@ -69,7 +87,7 @@ class TracerARM(TracerPYNQ):
             out_inter[ray] = closest_dist
             out_ids[ray]   = closest_tri
 
-        return (out_inter, out_ids)
+        return (out_ids, out_inter)
     
     def _intersect(self, ray, tri):
         ''' Implementation of the Möller algorithm for
