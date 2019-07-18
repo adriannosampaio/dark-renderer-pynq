@@ -20,4 +20,12 @@ class Parser:
             choices=['client', 'edge', 'master', 'node'],
             help='File containing the ray geometric information')
 
+        self.parser.add_argument(
+            '--use-python',
+            action='store_true')
+
         self.args = self.parser.parse_args()
+
+
+    def _logic_validation(self):
+        ag = self.args

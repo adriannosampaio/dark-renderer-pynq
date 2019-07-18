@@ -9,12 +9,11 @@ class TracerPYNQ:
 class TracerARM(TracerPYNQ):
     def __init__(
         self,
-        use_cpp=False,
+        use_python=False,
         use_multicore=False,
         use_fpga=False
     ):
-        print(use_cpp)
-        self.use_cpp = use_cpp
+        self.use_python = use_python
         self.use_fpga = False
         self.use_multicore = False
 
@@ -28,7 +27,7 @@ class TracerARM(TracerPYNQ):
             but I'll change it later
         '''
         intersects, ids = [], []
-        if self.use_cpp:
+        if not self.use_python:
             ids, intersects = self._computeCPP(
                 rays,
                 tri_ids,
@@ -37,8 +36,9 @@ class TracerARM(TracerPYNQ):
             ids, intersects = self._computeCPU(
                 np.array(rays), 
                 np.array(tris))
+            print(ids)
             intersects = intersects.tolist()
-            ids = list(map(lambda x : tri_ids[x], ids))
+            ids = list(map(lambda x : tri_ids[x] if x != -1 else -1, ids))
 
         return {
             'intersections' : intersects,
@@ -50,6 +50,8 @@ class TracerARM(TracerPYNQ):
         platform = platform.architecture()[0]
         if platform == '64bit':
             import application.bindings.x64.tracer as cpp_tracer
+        elif platform == 'ARM':
+            import application.bindings.ARM.tracer as cpp_tracer
         else:
             raise Exception('Platform not currently supported')
         return cpp_tracer.compute(rays, tri_ids, tris)

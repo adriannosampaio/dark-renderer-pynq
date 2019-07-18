@@ -7,7 +7,7 @@ from application.parser import Parser
 
 class DarkRendererNode():
 
-    def __init__(self, config):        
+    def __init__(self, config, use_python=False):        
         import socket as sk
         self.sock = sk.socket(sk.AF_INET, sk.SOCK_STREAM)
         self.config = config
@@ -18,7 +18,7 @@ class DarkRendererNode():
         self.addr = (ip, port)
         self.sock.bind(self.addr)
 
-        self.cpu_tracer = tracer.TracerARM(use_cpp=True)
+        self.cpu_tracer = tracer.TracerARM(use_python=use_python)
 
         # IP address of the cloud application
         # cloud_ip   = config['cloud']['ip']
@@ -46,9 +46,9 @@ class DarkRendererNode():
         self._parse_scene_data(scene_data)
         log.info('Computing intersection')
         result = self.cpu_tracer.compute(
-                self.rays,
-                self.triangle_ids,
-                self.triangles)
+            self.rays,
+            self.triangle_ids,
+            self.triangles)
         log.info('Finishing intersection calculation')
 
         result = json.dumps(result)
@@ -121,7 +121,8 @@ def main():
         datefmt='%d-%b-%y %H:%M:%S'
     )
     config = json.load(open("settings/default.json"))
-    dark_node = DarkRendererNode(config)
+    use_python = parser.args.use_python
+    dark_node = DarkRendererNode(config, use_python)
     try:
         dark_node.start()
     finally:
