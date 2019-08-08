@@ -10,6 +10,7 @@ class Session:
 	def __init__(self, input_filename, output_filename):
 		self.input_filename = input_filename
 		self.output_filename = output_filename
+		
 		self.input_file = open(input_filename, 'r')
 		line = self.input_file.readline().split()
 		self.num_tris = int(line[0])
@@ -28,7 +29,7 @@ class DarkRendererClient:
 		This includes the TCP requests to the Fog/Cloud, task 
 		sending and receiving the results.
 	'''
-	def __init__(self, input_filename, output_filename, config):
+	def __init__(self, input_filename=None, output_filename=None, config=None):
 		self.sock = socket.socket(
 			socket.AF_INET, 
 			socket.SOCK_STREAM)
@@ -38,10 +39,11 @@ class DarkRendererClient:
 		edge_port = config['edge']['port']
 		self.edge_addr = (edge_ip, edge_port)
 
-		print(f"Reading filename {input_filename}")
-		self.session = Session(input_filename, output_filename)
-		self.num_tris = self.session.num_tris
-		self.num_rays = self.session.num_rays
+		log.info(f"Reading filename {input_filename}")
+		if input_filename != None:
+			self.session = Session(input_filename, output_filename)
+			self.num_tris = self.session.num_tris
+			self.num_rays = self.session.num_rays
 
 	def _connect(self):
 		log.info(f'Connecting to edge node {self.edge_addr[0]}:{self.edge_addr[1]}')
@@ -51,25 +53,42 @@ class DarkRendererClient:
 		self.sock.close()
 
 	def _send(self, data):
-		print("Sending:", data)
+		#print("Sending:", data)
 		self.sock.send(data)
 
 	def _recv(self, size):
 		msg = self.sock.recv(size)
-		print("Received:", msg)
+		#print("Received:", msg)
 		return msg
+
+	def compute_string(self, scene_data):
+		# connect to the edge node
+		self._connect()
+		# send the task size
+		num_tris, num_rays, string_data = scene_data
+		# sending the scene	
+		self._send_scene_string(string_data)
+		log.info('Waiting for results')
+		result = self._receive_results()
+		log.info('Results received')
+		self._cleanup()
+		return result
+		
+	def _send_scene_string(self, string):
+		log.info('Sending scene configuration')
+		size = len(string)
+		msg = struct.pack('>I', size) + string.encode()
+		self._send(msg)
+		log.info("Configuration file sent")
 
 	def run(self):
 		# connect to the edge node
 		self._connect()
-		# send the task size
-		self._send_task_size()
 		# sending the scene	
 		self._send_scene_file()
 		log.info('Waiting for results')
 		result = self._receive_results()
 		log.info('Results received')
-		print(result)
 		with open(self.session.output_filename, 'w') as output_file:
 			output_file.write(result)
 		self._cleanup()
@@ -89,19 +108,6 @@ class DarkRendererClient:
 				break
 			full_data += packet
 		return full_data.decode()
-
-	def _send_task_size(self):
-		log.info('Sending task size to the Edge')
-		size_msg = f'{self.num_tris} {self.num_rays}'
-		log.debug(f'Sent: "{size_msg}"')
-		self._send(size_msg.encode())
-		# receive confirmation from the edge
-		ans = b'OK'# self._recv(16)
-		# when the edge confirms
-		if ans != b'OK': # send the scene
-			raise Exception('Edge Task refused...')
-		else:
-			print('Task size is OK')
 
 	def _send_scene_file(self):
 		log.info('Sending configuration file')
