@@ -7,5 +7,11 @@ intersectResults computeIntersections(
 	std::vector<double> rayData,
 	std::vector<int> triangleIds,
 	std::vector<double> triangleData); 
+	
+intersectResults computeIntersectionsParallel(
+	std::vector<double> rayData,
+	std::vector<int> triangleIds,
+	std::vector<double> triangleData
+);
 
 #endif

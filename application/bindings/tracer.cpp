@@ -122,4 +122,37 @@ intersectResults computeIntersections(
 	return std::make_pair(outIds, outInter);
 }
 
+intersectResults computeIntersectionsParallel(
+	std::vector<double> rayData,
+	std::vector<int> triangleIds,
+	std::vector<double> triangleData
+) {
+	// Task information
+	int numTriangles = triangleData.size() / TRIANGLE_ATTR_NUMBER ;
+	int numRays = rayData.size() / RAY_ATTR_NUMBER;
+	
+	std::vector<int> outIds(numRays);
+	std::vector<double> outInter(numRays);
+
+	#pragma omp parallel for
+	for(int ray = 0; ray < numRays; ray++)
+	{
+		outIds[ray]   = -1;
+		outInter[ray] = INFINITY; 
+
+		for(int tri = 0; tri < numTriangles; tri++)
+		{
+			double t;
+			if(rayIntersect(t, ray, rayData, tri, triangleData)) 
+			if(t < outInter[ray] && t > EPSILON)
+			{
+				outIds[ray] = triangleIds[tri];
+				outInter[ray] = t;
+			}
+		}
+	}
+
+	return std::make_pair(outIds, outInter);
+}
+
 
