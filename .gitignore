@@ -8,5 +8,4 @@ application/bindings/x64/
 *.vcxproj
 *.make
 *.user
-Makefile
 *.sln

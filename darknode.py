@@ -73,19 +73,19 @@ class DarkRendererNode():
         ti = time()
         scene_data = self._receive_scene_data()
         tf = time()
-        log.info(f'Finished receiving data in {tf - ti} seconds')
+        log.warning(f'Finished receiving data in {tf - ti} seconds')
 
         log.info('Parsing scene data')
         ti = time()
         self._parse_scene_data(scene_data)
         tf = time()
-        log.info(f'Finished parsing scene data in {tf - ti} seconds')
+        log.warning(f'Finished parsing scene data in {tf - ti} seconds')
 
         log.info('Computing intersection')
         ti = time()
         result = self._compute()
         tf = time()
-        log.info(f'Finishing intersection calculation in {tf - ti} seconds')
+        log.warning(f'Finishing intersection calculation in {tf - ti} seconds')
 
         log.info('Preparing and sending results')
         ti = time()
@@ -94,7 +94,7 @@ class DarkRendererNode():
         msg = struct.pack('>I', size) + result.encode()
         self.connection.send(msg)
         tf = time()
-        log.info(f'Finished sending results in {tf - ti} seconds')
+        log.warning(f'Finished sending results in {tf - ti} seconds')
 
     def _compute(self):
         import numpy as np
@@ -124,7 +124,6 @@ class DarkRendererNode():
 
             ids = fpga_ids + cpu_ids
             intersects = fpga_inter + cpu_inter
-            save_intersections('heterogenous.txt', ids, intersects)
 
         elif self.use_fpga:
             log.info('Computing in fpga-only mode')
@@ -136,14 +135,12 @@ class DarkRendererNode():
             while not self.fpga_tracer.is_done(): 
                 pass
             ids, intersects = self.fpga_tracer.get_results()
-            save_intersections(f'fpga_multi_{self.use_multi_fpga}.txt', ids, intersects)
         else:
             log.info('Computing in cpu-only mode')
             ids, intersects = self.cpu_tracer.compute(
                 self.rays,
                 self.triangle_ids,
                 self.triangles)
-            save_intersections('cpu.txt', ids, intersects)
 
         return {
             'intersections' : intersects,
