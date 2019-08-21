@@ -42,16 +42,13 @@ project "tracer"
     files { "binding.cpp", "tracer.cpp", "tracer.hpp"}
 
     filter "configurations:x32"
-        targetdir "x32"
         architecture "x86"
         optimize "On"
 
     filter "configurations:x64"
-        targetdir "x64"
         architecture "x64"
         optimize "On"
 
     filter "configurations:ARM"
-        targetdir "ARM"
         architecture "ARM"
         optimize "On"
