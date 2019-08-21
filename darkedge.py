@@ -10,17 +10,9 @@ def save_intersections(filename, ids, intersects):
         for tid, inter in zip(ids, intersects):
             file.write(f'{tid} {inter}\n')
 
-class DarkRendererNode():
+class DarkRendererEdge():
 
-    def __init__(self, 
-        config, 
-        use_python=False, 
-        use_multicore=False, 
-        use_fpga=False, 
-        use_multi_fpga=False,
-        use_heterogeneous=True,
-        fpga_load_fraction=0.5
-        ):        
+    def __init__(self, config):        
         
         import socket as sk
         self.sock = sk.socket(sk.AF_INET, sk.SOCK_STREAM)
@@ -31,27 +23,6 @@ class DarkRendererNode():
         port = config['edge']['port']
         self.addr = (ip, port)
         self.sock.bind(self.addr)
-
-
-        self.use_python = use_python
-        self.use_multicore = use_multicore
-        self.use_fpga = use_fpga
-        self.use_multi_fpga = use_multi_fpga
-        self.use_heterogeneous = use_heterogeneous
-        self.fpga_load_fraction = fpga_load_fraction
-
-        self.cpu_tracer = tracer.TracerCPU(
-            use_multicore=use_multicore,
-            use_python=use_python)
-
-        self.fpga_tracer = tracer.TracerFPGA(
-            '/home/xilinx/adrianno/intersect_fpga_x2.bit',
-            use_multi_fpga=use_multi_fpga)
-
-        # IP address of the cloud application
-        # cloud_ip   = config['cloud']['ip']
-        # cloud_port = config['cloud']['port']
-        # self.cloud_addr = (cloud_ip, cloud_port)
         
         self.connection = None
         self.client_ip = None
@@ -59,6 +30,30 @@ class DarkRendererNode():
         self.triangles    = []
         self.triangle_ids = []
         self.rays         = []
+
+        processing = config['processing']
+        mode = processing['mode']
+        self.heterogeneous_mode = (mode == 'heterogenous')
+        self.cpu_active = mode in ['cpu', 'heterogenous']
+        self.fpga_active = mode in ['fpga', 'heterogenous']
+        
+        if self.heterogeneous_mode:
+            self.fpga_load_fraction = processing['heterogenous']['fpga-load']
+
+        if self.cpu_active:
+            cpu_mode = processing['cpu']['mode']    
+            use_python = (cpu_mode == 'python')
+            use_multicore = (cpu_mode == 'multicore')
+            self.cpu_tracer = tracer.TracerCPU(
+                use_multicore=use_multicore,
+                use_python=use_python)
+
+        if self.fpga_active:
+            fpga_mode = processing['fpga']['mode']
+            use_multi_fpga = (fpga_mode == 'multi')
+            self.fpga_tracer = tracer.TracerFPGA(
+                config['edge']['bitstream'],
+                use_multi_fpga=use_multi_fpga)
         
     def cleanup(self):
         self.sock.close()
@@ -100,8 +95,8 @@ class DarkRendererNode():
         import numpy as np
         log.info('Starting edge computation')
         intersects, ids = [], []
-        if self.use_heterogeneous: # currently balancing 50%-50%
-            log.info('Computing in heterogenous mode')
+        if self.heterogeneous_mode: # currently balancing 50%-50%
+            log.info('Computing in heterogeneous mode')
             num_rays = len(self.rays) // 6      
 
             log.info(f'FPGA processing {self.fpga_load_fraction*100}% (self.fpga_load_fraction)')
@@ -125,7 +120,7 @@ class DarkRendererNode():
             ids = fpga_ids + cpu_ids
             intersects = fpga_inter + cpu_inter
 
-        elif self.use_fpga:
+        elif self.fpga_active:
             log.info('Computing in fpga-only mode')
             self.fpga_tracer.compute(
                 self.rays,
@@ -182,21 +177,3 @@ class DarkRendererNode():
         self.triangles    = list(map(float, task_data[self.num_tris : tri_end]))
         self.rays         = list(map(float, task_data[tri_end : ]))
 
-def main():
-    
-    parser = Parser()
-    log.basicConfig(
-        level=log.DEBUG, 
-        format='%(levelname)s: [%(asctime)s] - %(message)s', 
-        datefmt='%d-%b-%y %H:%M:%S'
-    )
-    config = json.load(open("settings/default.json"))
-    use_python = parser.args.use_python
-    dark_node = DarkRendererNode(config, use_python)
-    try:
-        dark_node.start()
-    finally:
-        dark_node.cleanup()
-
-if __name__ == '__main__':
-    main()

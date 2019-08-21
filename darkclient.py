@@ -53,24 +53,29 @@ class DarkRendererClient:
 		self.sock.close()
 
 	def _send(self, data):
-		#print("Sending:", data)
 		self.sock.send(data)
 
 	def _recv(self, size):
 		msg = self.sock.recv(size)
-		#print("Received:", msg)
 		return msg
 
-	def compute_string(self, scene_data):
+	def compute_scene(self, scene):
 		# connect to the edge node
 		self._connect()
-		# send the task size
-		num_tris, num_rays, string_data = scene_data
+
+		# preparing scene to send
+		num_tris, num_rays = len(scene.triangles), scene.camera.vres * scene.camera.hres
+		string_data  = f'{num_tris} {num_rays}\n' 
+		string_data += f'{scene.get_triangles_string()}\n' 
+		string_data += f'{scene.camera.get_rays_string()}'
+
 		# sending the scene	
 		self._send_scene_string(string_data)
+
 		log.info('Waiting for results')
 		result = self._receive_results()
 		log.info('Results received')
+
 		self._cleanup()
 		return result
 		
@@ -80,18 +85,6 @@ class DarkRendererClient:
 		msg = struct.pack('>I', size) + string.encode()
 		self._send(msg)
 		log.info("Configuration file sent")
-
-	def run(self):
-		# connect to the edge node
-		self._connect()
-		# sending the scene	
-		self._send_scene_file()
-		log.info('Waiting for results')
-		result = self._receive_results()
-		log.info('Results received')
-		with open(self.session.output_filename, 'w') as output_file:
-			output_file.write(result)
-		self._cleanup()
 
 	def _receive_results(self):
 		log.info("Start receiving results")
@@ -117,21 +110,3 @@ class DarkRendererClient:
 			msg = struct.pack('>I', size) + file.encode()
 			self._send(msg)
 		log.info("Configuration file sent")
-
-
-def main():
-	log.basicConfig(
-		level=log.DEBUG, 
-		format='%(levelname)s: [%(asctime)s] - %(message)s', 
-		datefmt='%d-%b-%y %H:%M:%S'
-	)
-	parser = Parser()
-	input_filename = parser.args.f
-	output_filename = parser.args.o
-	config = json.load(open("settings/default.json"))
-	client = DarkRendererClient(input_filename, output_filename, config)
-	client.run()
-
-
-if __name__ == '__main__':
-	main()

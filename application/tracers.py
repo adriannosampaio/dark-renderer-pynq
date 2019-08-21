@@ -1,9 +1,6 @@
 import numpy as np 
 import logging as log
-from pynq import Overlay, Xlnk
 from time import time
-
-xlnk = Xlnk()
 
 class TracerPYNQ:
     MAX_DISTANCE = 1e9
@@ -35,6 +32,8 @@ class XIntersectFPGA():
         return self.intersect_ip.read(0x00) == 4
 
     def compute(self, rays, tri_ids, tris):
+        from pynq import Xlnk
+        xlnk = Xlnk()
         num_tris = len(tris) // 9
         num_rays = len(rays) // 6
 
@@ -200,6 +199,7 @@ class TracerCPU(TracerPYNQ):
 
 class TracerFPGA(TracerPYNQ):
     def __init__(self, overlay_filename: str, use_multi_fpga: bool = False):
+        from pynq import Overlay
         self.use_multi_fpga = use_multi_fpga
         self.accelerators = []
 
