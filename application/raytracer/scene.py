@@ -89,6 +89,15 @@ class Camera():
 
 		self.v = np.cross(self.w, self.u)
 
+	def get_string(self):
+		res = f'{self.hres} {self.vres}\n'
+		res+= f'{str(self.eye_point)[1:-1]}\n'
+		res+= f'{str(self.look_point)[1:-1]}\n'
+		res+= f'{str(self.up_vec)[1:-1]}\n'
+		res+= f'{self.dist} {self.psize}'
+		return res
+
+
 	def get_ray(self, c, r):
 		xv = self.psize*(c - self.hres/2),
 		yv = self.psize*(r - self.vres/2);
