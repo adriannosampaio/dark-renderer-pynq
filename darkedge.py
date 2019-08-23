@@ -4,6 +4,7 @@ import logging as log
 import struct
 import application.tracers as tracer
 from application.parser import Parser
+from time import time
 
 def save_intersections(filename, ids, intersects):
     with open(filename, 'w') as file:
@@ -59,7 +60,6 @@ class DarkRendererEdge():
         self.sock.close()
         
     def start(self):
-        from time import time
 
         log.info("Waiting for client connection")
         self._await_connection()
@@ -150,18 +150,25 @@ class DarkRendererEdge():
 
     def _receive_scene_data(self):
         log.info("Start reading scene file content")
-
         raw_size = self.connection.recv(4)
         size = struct.unpack('>I', raw_size)[0]
         log.info(f'Finishing receiving scene file size: {size}B')
         
-        CHUNK_SIZE = 256
+        CHUNK_SIZE = self.config['networking']['recv_buffer_size']
         full_data = b''
         while len(full_data) < size:
-            packet = self.connection.recv(CHUNK_SIZE)
+            packet = self.connection.recv(min(CHUNK_SIZE, size))
             if not packet:
                 break
             full_data += packet
+        
+        if self.config['networking']['compression']:
+            import zlib
+
+            ti = time()
+            full_data = zlib.decompress(full_data)
+            log.warning(f'Compression time: {time() - ti} seconds')
+
         return full_data.decode()
 
     NUM_TRIANGLE_ATTRS = 9
