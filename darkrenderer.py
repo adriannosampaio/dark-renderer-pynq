@@ -30,11 +30,11 @@ def run_client(config):
 		np.array([0.0, 0.0, 0.3]),
 		np.array([0.0, 0.0, 1.0]),
 		200, psize)
-	log.warning(f'Finished standalone setup in {time() - ti} seconds')
+	log.warning(f'Setup time: {time() - ti} seconds')
 
 	ti = time()
 	res = json.loads(client.compute_scene(scene))
-	log.warning(f'Finished intersection calculations in {time() - ti} seconds')
+	log.warning(f'Intersection time: {time() - ti} seconds')
 	
 	ti = time()
 	final_img = Image.new('RGB', (scene.camera.hres, scene.camera.vres), (0,0,0))
@@ -54,7 +54,7 @@ def run_client(config):
 	
 	log.info(f'Saving {image_name}')
 	final_img.save(image_name)
-	log.warning(f'Finished shading calculations in {time() - ti} seconds')
+	log.warning(f'Shading time: {time() - ti} seconds')
 
 def run_edge(config):
 	dark_node = DarkRendererEdge(config)

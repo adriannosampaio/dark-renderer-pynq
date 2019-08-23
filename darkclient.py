@@ -47,10 +47,13 @@ class DarkRendererClient:
 		self._connect()
 
 		# preparing scene to send
+		ti = time()
 		num_tris, num_rays = len(scene.triangles), scene.camera.vres * scene.camera.hres
 		string_data  = f'{num_tris} {num_rays}\n' 
 		string_data += f'{scene.get_triangles_string()}\n' 
 		string_data += f'{scene.camera.get_rays_string()}'
+		tf = time()
+		log.warning(f'Parse scene time: {tf - ti} seconds')
 
 		# sending the scene	
 		self._send_scene_string(string_data)
@@ -59,7 +62,7 @@ class DarkRendererClient:
 		ti = time()
 		result = self._receive_results()
 		tf = time()
-		log.warning(f'Finishing receiving results in {tf - ti} seconds')
+		log.warning(f'Recv time: {tf - ti} seconds')
 
 		self._cleanup()
 		return result

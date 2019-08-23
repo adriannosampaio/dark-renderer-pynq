@@ -68,19 +68,19 @@ class DarkRendererEdge():
         ti = time()
         scene_data = self._receive_scene_data()
         tf = time()
-        log.warning(f'Finished receiving data in {tf - ti} seconds')
+        log.warning(f'Recv time: {tf - ti} seconds')
 
         log.info('Parsing scene data')
         ti = time()
         self._parse_scene_data(scene_data)
         tf = time()
-        log.warning(f'Finished parsing scene data in {tf - ti} seconds')
+        log.warning(f'Parse time: {tf - ti} seconds')
 
         log.info('Computing intersection')
         ti = time()
         result = self._compute()
         tf = time()
-        log.warning(f'Finishing intersection calculation in {tf - ti} seconds')
+        log.warning(f'Intersection time: {tf - ti} seconds')
 
         log.info('Preparing and sending results')
         ti = time()
@@ -89,7 +89,7 @@ class DarkRendererEdge():
         msg = struct.pack('>I', size) + result.encode()
         self.connection.send(msg)
         tf = time()
-        log.warning(f'Finished sending results in {tf - ti} seconds')
+        log.warning(f'Send time: in {tf - ti} seconds')
 
     def _compute(self):
         import numpy as np
