@@ -33,12 +33,12 @@ class DarkRendererEdge():
 
         processing = config['processing']
         mode = processing['mode']
-        self.heterogeneous_mode = (mode == 'heterogenous')
-        self.cpu_active = mode in ['cpu', 'heterogenous']
-        self.fpga_active = mode in ['fpga', 'heterogenous']
+        self.heterogeneous_mode = (mode == 'heterogeneous')
+        self.cpu_active = mode in ['cpu', 'heterogeneous']
+        self.fpga_active = mode in ['fpga', 'heterogeneous']
         
         if self.heterogeneous_mode:
-            self.fpga_load_fraction = processing['heterogenous']['fpga-load']
+            self.fpga_load_fraction = processing['heterogeneous']['fpga-load']
 
         if self.cpu_active:
             cpu_mode = processing['cpu']['mode']    
