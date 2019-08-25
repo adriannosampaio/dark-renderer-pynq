@@ -52,18 +52,15 @@ std::vector<double> generate_primary_rays(
             for (int i = 0; i < 3; i ++)
                 result.push_back(eye_point[i]);
 
-            double xv = pixel_size * double(c - hres / 2.0);
-            double yv = pixel_size * double(r - vres / 2.0);
+            double xv = pixel_size * double(c - (hres / 2));
+            double yv = pixel_size * double(r - (vres / 2));
             
             ASSIGN(xvtu, u);
             ASSIGN(yvtv, v);
             ASSIGN(dstw, w);
 
             for (int i = 0; i < 3; i++){
-                xvtu[i] = u[i] * xv;
-                yvtv[i] = v[i] * yv;
-                dstw[i] = w[i] * distance;
-                ray_dir[i] = xvtu[i] + yvtv[i] + dstw[i];
+                ray_dir[i] = xv*u[i] + yv*v[i] - distance*w[i];
             }
 
             normalize(ray_dir);

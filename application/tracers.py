@@ -230,12 +230,6 @@ class TracerFPGA(TracerPYNQ):
             ids1, intersects1 = self.accelerators[1].get_results()
             intersects = intersects0 + intersects1
             ids =  ids0 + ids1
-            with open(f'multi_fpga_0.txt', 'w') as file:
-                for tid, inter in zip(ids0, intersects0):
-                    file.write(f'{tid} {inter}\n')
-            with open(f'multi_fpga_1.txt', 'w') as file:
-                for tid, inter in zip(ids1, intersects1):
-                    file.write(f'{tid} {inter}\n')
         else:
             ids, intersects = self.accelerators[0].get_results()
         return (ids, intersects)
