@@ -193,4 +193,4 @@ class DarkRendererEdge():
             np.array(float_data[3:6]),
             np.array(float_data[6:9]),
             float_data[9], float_data[10])
-        self.rays = list(map(float, self.camera.get_rays_string().split()))
+        self.rays = self.camera.get_rays()

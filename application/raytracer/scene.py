@@ -105,6 +105,18 @@ class Camera():
 		d /= np.linalg.norm(d)
 		return Ray(self.eye_point, d)
 
+	def get_rays(self):
+		out = []
+		for r in range(self.vres):
+			for c in range(self.hres):
+				xv = self.psize*(c - self.hres/2),
+				yv = self.psize*(r - self.vres/2);
+				rdir = xv*self.u + yv*self.v - self.dist*self.w
+				rdir /= np.linalg.norm(rdir)
+				out += list(self.eye_point)
+				out += list(rdir)
+		return out
+
 	def get_rays_string(self):
 		out = ''
 		for r in range(self.vres):
