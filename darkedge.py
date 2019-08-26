@@ -4,6 +4,7 @@ import logging as log
 import struct
 import application.tracers as tracer
 from application.parser import Parser
+from application.raytracer.scene import Camera
 from time import time
 
 def save_intersections(filename, ids, intersects):
@@ -31,6 +32,7 @@ class DarkRendererEdge():
         self.triangles    = []
         self.triangle_ids = []
         self.rays         = []
+        self.camera       = None
 
         processing = config['processing']
         mode = processing['mode']
@@ -182,5 +184,13 @@ class DarkRendererEdge():
         tri_end = self.num_tris * (self.NUM_TRIANGLE_ATTRS+1)
         self.triangle_ids = list(map(int, task_data[: self.num_tris]))
         self.triangles    = list(map(float, task_data[self.num_tris : tri_end]))
-        self.rays         = list(map(float, task_data[tri_end : ]))
-
+        
+        cam_data = task_data[tri_end : ]
+        res = (int(cam_data[0]), int(cam_data[1]))
+        float_data = list(map(float, cam_data[2:])) 
+        self.camera = Camera(res, 
+            np.array(float_data[:3]),
+            np.array(float_data[3:6]),
+            np.array(float_data[6:9]),
+            float_data[9], float_data[10])
+        self.rays = self.camera.get_rays(cpp_version=True)
