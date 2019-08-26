@@ -110,3 +110,4 @@ class DarkRendererClient:
 			msg = struct.pack('>I', size) + file.encode()
 			self._send(msg)
 		log.info("Configuration file sent")
+
