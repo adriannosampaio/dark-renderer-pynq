@@ -1,17 +1,31 @@
 import numpy as np 
 import logging as log
 from time import time
+from .scheduling import TaskResult
 
 class TracerPYNQ:
     MAX_DISTANCE = 1e9
     EPSILON = 1.0e-5
-
     def set_scene(self, tri_ids, triangles):
          self.tri_ids = tri_ids
          self.tris = triangles
 
     def compute(self, rays):
         raise Exception('ERROR: Using abstract class')
+
+    def start(self, task_queue, result_queue):
+        task = task_queue.get()
+        while task is not None:
+            print(f'Processing task {task.id}')
+            out_ids, out_inter = self.compute(task.ray_data)
+            result = TaskResult(
+                task.id,
+                out_ids,
+                out_inter)
+            result_queue.put(result)
+            task = task_queue.get()
+        result_queue.put(None)
+
 
 class XIntersectFPGA():
     
@@ -83,7 +97,7 @@ class XIntersectFPGA():
 
 
 class TracerCPU(TracerPYNQ):
-    def __init__(self, use_multicore: bool = True):
+    def __init__(self, use_multicore: bool):
         self.use_multicore = use_multicore
 
     def compute(self, rays):
@@ -97,13 +111,13 @@ class TracerCPU(TracerPYNQ):
         '''
         intersects, ids = [], []
         import application.bindings.tracer as cpp_tracer
-            if self.use_multicore: 
-                # CPP Code with OpenMP parallelism
-            ids, intersects = cpp_tracer.compute(
-                rays, self.tri_ids, self.tris)
-            else: 
-                # CPP without parallelism
+        if self.use_multicore: 
+            # CPP Code with OpenMP parallelism
             ids, intersects = cpp_tracer.computeParallel(
+                rays, self.tri_ids, self.tris)
+        else: 
+            # CPP without parallelism
+            ids, intersects = cpp_tracer.compute(
                 rays, self.tri_ids, self.tris)
 
         return (ids, intersects)

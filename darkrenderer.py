@@ -6,6 +6,7 @@ from time import time
 from application.parser import Parser
 from darkclient import DarkRendererClient
 from darkedge import DarkRendererEdge
+import multiprocessing as mp
 
 parser = Parser()
 
@@ -66,11 +67,11 @@ def run_edge(config):
 		dark_node.cleanup()
 
 def main():
+	mp.freeze_support()
 	log.basicConfig(
-		level=log.WARNING, 
+		level=log.INFO, 
 		format='%(levelname)s: [%(asctime)s] - %(message)s', 
 		datefmt='%d-%b-%y %H:%M:%S')
-	
 	config = json.load(open("settings/default.json"))
 	log.info(f'Starting in {parser.args.mode} mode')
 	if parser.args.mode == 'client':

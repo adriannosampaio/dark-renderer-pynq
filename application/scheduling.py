@@ -18,7 +18,7 @@ class Task(Counter):
 class TaskResult():
     """docstring for Result"""
     def __init__(self, task_id, triangles_hit, intersections):
-        super(Result, self).__init__()
+        super().__init__()
         self.task_id = task_id
         self.triangles_hit = triangles_hit
         self.intersections = intersections
