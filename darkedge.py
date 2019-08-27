@@ -5,6 +5,7 @@ import struct
 import application.tracers as tracer
 from application.parser import Parser
 from application.raytracer.scene import Camera
+from application.scheduling import Task, TaskResult
 from time import time
 
 def save_intersections(filename, ids, intersects):
@@ -194,3 +195,25 @@ class DarkRendererEdge():
             np.array(float_data[6:9]),
             float_data[9], float_data[10])
         self.rays = self.camera.get_rays(cpp_version=True)
+
+        Task.next_id = 0
+        self.tasks = divide_tasks(self.rays)
+        for t in tasks:
+            print(t.id, len(t))
+
+
+def divide_tasks(rays):
+    num_rays = len(rays)//6
+    max_task_size = 2
+    number_of_tasks = int(np.ceil(num_rays/max_task_size))
+    ray_tasks = []
+    for i in range(1, number_of_tasks+1):
+        task_start = (i - 1) * max_task_size * 6
+        task_data = []
+        if i < number_of_tasks:
+            task_end = task_start + (max_task_size*6)
+            task_data = rays[task_start : task_end]
+        else:
+            task_data = rays[task_start : ]
+        ray_tasks.append(Task(task_data))   
+    return ray_tasks
