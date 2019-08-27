@@ -5,7 +5,12 @@ from time import time
 class TracerPYNQ:
     MAX_DISTANCE = 1e9
     EPSILON = 1.0e-5
-    def compute(self, rays, tri_ids, tris):
+
+    def set_scene(self, tri_ids, triangles):
+         self.tri_ids = tri_ids
+         self.tris = triangles
+
+    def compute(self, rays):
         raise Exception('ERROR: Using abstract class')
 
 class XIntersectFPGA():
@@ -77,49 +82,11 @@ class XIntersectFPGA():
         return (self._out_ids.tolist(), self._out_inter.tolist())
 
 
-    
-def ray_triangle_intersect(self, ray, tri):
-    ''' Implementation of the Möller algorithm for
-        ray-triangle intersection calculation
-    '''
-    origin, direction = np.array(ray[:3]), np.array(ray[3:6])
-    v0, v1, v2 = (np.array(tri[3*x: 3*x+3]) for x in range(3))
-    EPSILON = 1.0e-5
-
-    edge1 = v1 - v0
-    edge2 = v2 - v0
-
-    h = np.cross(direction, edge2)
-    a = np.dot(edge1, h)
-
-    if -EPSILON < a < EPSILON:
-        return None
-
-    f = 1.0 / a
-    s = origin - v0
-    u = f * np.dot(s, h)
-
-    if not 0.0 <= u <= 1.0:
-        return None
-
-    q = np.cross(s, edge1)
-    v = f * np.dot(direction, q)
-
-    if v < 0.0 or u + v > 1.0:
-        return None
-
-    t = f * np.dot(edge2, q)
-
-    if EPSILON < t < 1e9:
-        return t
-
-
 class TracerCPU(TracerPYNQ):
-    def __init__(self, use_multicore: bool = True, use_python: bool = False):
-        self.use_python = use_python
+    def __init__(self, use_multicore: bool = True):
         self.use_multicore = use_multicore
 
-    def compute(self, rays, tri_ids, tris):
+    def compute(self, rays):
         ''' Call the ray-triangle intersection calculation
             method and convert the triangle indentifiers to 
             global
@@ -129,72 +96,17 @@ class TracerCPU(TracerPYNQ):
             but I'll change it later
         '''
         intersects, ids = [], []
-
-        if not self.use_python:
+        import application.bindings.tracer as cpp_tracer
             if self.use_multicore: 
                 # CPP Code with OpenMP parallelism
-                ids, intersects = self._compute_multicore(
-                    rays,
-                    tri_ids,
-                    tris)
+            ids, intersects = cpp_tracer.compute(
+                rays, self.tri_ids, self.tris)
             else: 
                 # CPP without parallelism
-                ids, intersects = self._compute_cpp(
-                    rays,
-                    tri_ids,
-                    tris)
-        else: # using the pure python implementation
-            ids, intersects = self._compute_python(
-                np.array(rays), 
-                np.array(tris))
-            intersects = intersects.tolist()
-            ids = list(map(lambda x : tri_ids[x] if x != -1 else -1, ids))
+            ids, intersects = cpp_tracer.computeParallel(
+                rays, self.tri_ids, self.tris)
 
         return (ids, intersects)
-
-    def _compute_cpp(self, rays, tri_ids, tris):
-        import application.bindings.tracer as cpp_tracer
-        return cpp_tracer.compute(rays, tri_ids, tris)
-
-    def _compute_multicore(self, rays, tri_ids, tris):
-        import application.bindings.tracer as cpp_tracer
-        return cpp_tracer.computeParallel(rays, tri_ids, tris)
-
-    def _compute_python(self, rays, triangles):
-        ''' Compute the intersection of a set of rays against
-            a set of triangles
-        '''
-        # data structures info
-        ray_attrs = 6
-        num_rays = len(rays) // ray_attrs
-        tri_attrs = 9
-        num_tris = len(triangles) // tri_attrs
-        # output array
-        out_inter = np.full(num_rays, 1.0e9)
-        out_ids   = np.full(num_rays, -1)
-        # for each ray
-        for ray in range(num_rays):
-            # select ray
-            ray_base = ray * ray_attrs
-            closest_tri, closest_dist = -1, self.MAX_DISTANCE
-            ray_data = rays[ray_base : ray_base + ray_attrs]
-
-            for tri in range(num_tris):
-                tri_base = tri * tri_attrs
-            
-                tri_data = triangles[tri_base : tri_base + tri_attrs]
-            
-                dist = ray_triangle_intersect(ray_data, tri_data)
-            
-                if dist is not None and dist < closest_dist:
-                    closest_dist = dist
-                    closest_tri  = tri
-
-            out_inter[ray] = closest_dist
-            out_ids[ray]   = closest_tri
-
-        return (out_ids, out_inter)
-
 
 
 class TracerFPGA(TracerPYNQ):
@@ -234,7 +146,23 @@ class TracerFPGA(TracerPYNQ):
             ids, intersects = self.accelerators[0].get_results()
         return (ids, intersects)
 
-    def compute(self, rays, tri_ids, tris):
+    def start_compute(self, rays):
+        if self.use_multi_fpga:
+            num_rays = len(rays) // 6
+            self.accelerators[0].compute(
+                rays[ : 6*(num_rays//2)], 
+                self.tri_ids, 
+                self.tris)
+
+            self.accelerators[1].compute(
+                rays[6*(num_rays//2) : ], 
+                self.tri_ids, 
+                self.tris)
+        else:
+            self.accelerators[0].compute(rays, tri_ids, tris)
+        
+
+    def compute(self, rays):
         ''' Call the ray-triangle intersection FPGA accelerator
 
             P.S.: This operation is non-blocking, so it's 
@@ -245,13 +173,18 @@ class TracerFPGA(TracerPYNQ):
             num_rays = len(rays) // 6
             self.accelerators[0].compute(
                 rays[ : 6*(num_rays//2)], 
-                tri_ids, 
-                tris)
+                self.tri_ids, 
+                self.tris)
 
             self.accelerators[1].compute(
                 rays[6*(num_rays//2) : ], 
-                tri_ids, 
-                tris)
+                self.tri_ids, 
+                self.tris)
         else:
             self.accelerators[0].compute(rays, tri_ids, tris)
         
+
+        while not self.is_done():
+            time.sleep(0.2)
+
+        return self.get_results()

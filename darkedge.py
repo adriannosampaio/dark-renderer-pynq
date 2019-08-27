@@ -49,8 +49,7 @@ class DarkRendererEdge():
             use_python = (cpu_mode == 'python')
             use_multicore = (cpu_mode == 'multicore')
             self.cpu_tracer = tracer.TracerCPU(
-                use_multicore=use_multicore,
-                use_python=use_python)
+                use_multicore=use_multicore)
 
         if self.fpga_active:
             fpga_mode = processing['fpga']['mode']
@@ -97,6 +96,15 @@ class DarkRendererEdge():
     def _compute(self):
         import numpy as np
         log.info('Starting edge computation')
+        if self.fpga_active:
+            self.fpga_tracer.set_scene(
+                self.triangle_ids,
+                self.triangles)
+        if self.cpu_active:
+            self.cpu_tracer.set_scene(
+                self.triangle_ids,
+                self.triangles)
+
         intersects, ids = [], []
         if self.heterogeneous_mode: # currently balancing 50%-50%
             log.info('Computing in heterogeneous mode')
@@ -106,39 +114,26 @@ class DarkRendererEdge():
             fpga_load = int(np.floor(num_rays * self.fpga_load_fraction))
             log.info(f'FPGA load is {fpga_load}/{num_rays} rays')
 
-            self.fpga_tracer.compute(
-                self.rays[:fpga_load*6],
-                self.triangle_ids,
-                self.triangles)
+            self.fpga_tracer.start_compute(
+                self.rays[:fpga_load*6])
 
             cpu_ids, cpu_inter = self.cpu_tracer.compute(
-                self.rays[fpga_load*6:],
-                self.triangle_ids,
-                self.triangles)
+                self.rays[fpga_load*6:])
 
             while not self.fpga_tracer.is_done(): pass
             fpga_ids, fpga_inter = self.fpga_tracer.get_results()
-            #print(fpga_ids, fpga_inter, cpu_ids, cpu_inter)
 
             ids = fpga_ids + cpu_ids
             intersects = fpga_inter + cpu_inter
 
         elif self.fpga_active:
             log.info('Computing in fpga-only mode')
-            self.fpga_tracer.compute(
-                self.rays,
-                self.triangle_ids,
-                self.triangles)
-
-            while not self.fpga_tracer.is_done(): 
-                pass
-            ids, intersects = self.fpga_tracer.get_results()
+            ids, intersects = self.fpga_tracer.compute(
+                self.rays)
         else:
             log.info('Computing in cpu-only mode')
             ids, intersects = self.cpu_tracer.compute(
-                self.rays,
-                self.triangle_ids,
-                self.triangles)
+                self.rays)
 
         return {
             'intersections' : intersects,
