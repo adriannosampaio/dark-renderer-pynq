@@ -21,4 +21,9 @@ class Parser:
             type=float,
             help='Pixel size')
 
+        self.parser.add_argument(
+            '--task-size',
+            type=int,
+            help='Maximum size for processing tasks')
+
         self.args = self.parser.parse_args()

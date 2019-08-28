@@ -16,6 +16,15 @@
 		"port" : 7501
 	},
 
+	"networking" : {
+		"recv_buffer_size" : 262144,
+		"compression" : false
+	},
+
+	"testing" : {
+		"nruns" : 3
+	},
+
 	"processing" : {
 		"_comment" : "3 modes: fpga, cpu and heterogeneous",
 		"mode" : "cpu",
@@ -28,7 +37,7 @@
 			"mode" : "multi"
 		},
 		"heterogeneous" : {
-			"fpga-load" : 0.4
+			"fpga_load" : 0.4
 		}
 	}
 }

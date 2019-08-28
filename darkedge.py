@@ -4,6 +4,10 @@ import logging as log
 import struct
 import application.tracers as tracer
 from application.parser import Parser
+from application.raytracer.scene import Camera
+from application.scheduling import Task, TaskResult
+import multiprocessing as mp
+from time import time
 
 def save_intersections(filename, ids, intersects):
     with open(filename, 'w') as file:
@@ -30,6 +34,10 @@ class DarkRendererEdge():
         self.triangles    = []
         self.triangle_ids = []
         self.rays         = []
+        self.camera       = None
+
+        self.task_queue = mp.Queue()
+        self.result_queue = mp.Queue()
 
         processing = config['processing']
         mode = processing['mode']
@@ -40,13 +48,17 @@ class DarkRendererEdge():
         if self.heterogeneous_mode:
             self.fpga_load_fraction = processing['heterogeneous']['fpga-load']
 
+        self.tracers = []
+
         if self.cpu_active:
             cpu_mode = processing['cpu']['mode']    
             use_python = (cpu_mode == 'python')
             use_multicore = (cpu_mode == 'multicore')
             self.cpu_tracer = tracer.TracerCPU(
-                use_multicore=use_multicore,
-                use_python=use_python)
+                use_multicore=use_multicore)
+            self.tracers.append(self.cpu_tracer)
+            # self.tracers.append(tracer.TracerCPU(
+                # use_multicore=use_multicore))
 
         if self.fpga_active:
             fpga_mode = processing['fpga']['mode']
@@ -54,12 +66,12 @@ class DarkRendererEdge():
             self.fpga_tracer = tracer.TracerFPGA(
                 config['edge']['bitstream'],
                 use_multi_fpga=use_multi_fpga)
+            self.tracers.append(self.fpga_tracer)
         
     def cleanup(self):
         self.sock.close()
         
     def start(self):
-        from time import time
 
         log.info("Waiting for client connection")
         self._await_connection()
@@ -68,19 +80,19 @@ class DarkRendererEdge():
         ti = time()
         scene_data = self._receive_scene_data()
         tf = time()
-        log.warning(f'Finished receiving data in {tf - ti} seconds')
+        log.warning(f'Recv time: {tf - ti} seconds')
 
         log.info('Parsing scene data')
         ti = time()
         self._parse_scene_data(scene_data)
         tf = time()
-        log.warning(f'Finished parsing scene data in {tf - ti} seconds')
+        log.warning(f'Parse time: {tf - ti} seconds')
 
         log.info('Computing intersection')
         ti = time()
         result = self._compute()
         tf = time()
-        log.warning(f'Finishing intersection calculation in {tf - ti} seconds')
+        log.warning(f'Intersection time: {tf - ti} seconds')
 
         log.info('Preparing and sending results')
         ti = time()
@@ -89,53 +101,54 @@ class DarkRendererEdge():
         msg = struct.pack('>I', size) + result.encode()
         self.connection.send(msg)
         tf = time()
-        log.warning(f'Finished sending results in {tf - ti} seconds')
+        log.warning(f'Send time: in {tf - ti} seconds')
 
     def _compute(self):
         import numpy as np
         log.info('Starting edge computation')
-        intersects, ids = [], []
-        if self.heterogeneous_mode: # currently balancing 50%-50%
-            log.info('Computing in heterogeneous mode')
-            num_rays = len(self.rays) // 6      
 
-            log.info(f'FPGA processing {self.fpga_load_fraction*100}% (self.fpga_load_fraction)')
-            fpga_load = int(np.floor(num_rays * self.fpga_load_fraction))
-            log.info(f'FPGA load is {fpga_load}/{num_rays} rays')
-
-            self.fpga_tracer.compute(
-                self.rays[:fpga_load*6],
+        processes = []
+        for tracer in self.tracers:
+            tracer.set_scene(
                 self.triangle_ids,
                 self.triangles)
 
-            cpu_ids, cpu_inter = self.cpu_tracer.compute(
-                self.rays[fpga_load*6:],
-                self.triangle_ids,
-                self.triangles)
+            processes.append(
+                mp.Process(
+                    target=tracer.start, 
+                    args=(self.task_queue, self.result_queue)
+                )
+            )
 
-            while not self.fpga_tracer.is_done(): pass
-            fpga_ids, fpga_inter = self.fpga_tracer.get_results()
-            #print(fpga_ids, fpga_inter, cpu_ids, cpu_inter)
+        for p in processes:
+            p.start()
 
-            ids = fpga_ids + cpu_ids
-            intersects = fpga_inter + cpu_inter
+        tracers_finished = 0
+        from sortedcontainers import SortedDict
+        from functools import reduce
+        ids_dict = SortedDict()
+        intersect_dict = SortedDict() 
 
-        elif self.fpga_active:
-            log.info('Computing in fpga-only mode')
-            self.fpga_tracer.compute(
-                self.rays,
-                self.triangle_ids,
-                self.triangles)
+        print(f'num tracers = {len(self.tracers)}')
+        while tracers_finished < len(self.tracers):
+            res = self.result_queue.get()
+            if res is None:
+                tracers_finished += 1
+            else:
+                task_id = res.task_id 
+                ids_dict[task_id] = res.triangles_hit
+                intersect_dict[task_id] = res.intersections
 
-            while not self.fpga_tracer.is_done(): 
-                pass
-            ids, intersects = self.fpga_tracer.get_results()
-        else:
-            log.info('Computing in cpu-only mode')
-            ids, intersects = self.cpu_tracer.compute(
-                self.rays,
-                self.triangle_ids,
-                self.triangles)
+        for p in processes:
+            p.join()
+
+        ids = reduce(
+            lambda x, y : x + y,
+            ids_dict.values())
+
+        intersects = reduce(
+            lambda x, y : x + y,
+            intersect_dict.values())
 
         return {
             'intersections' : intersects,
@@ -150,18 +163,25 @@ class DarkRendererEdge():
 
     def _receive_scene_data(self):
         log.info("Start reading scene file content")
-
         raw_size = self.connection.recv(4)
         size = struct.unpack('>I', raw_size)[0]
         log.info(f'Finishing receiving scene file size: {size}B')
         
-        CHUNK_SIZE = 256
+        CHUNK_SIZE = self.config['networking']['recv_buffer_size']
         full_data = b''
         while len(full_data) < size:
-            packet = self.connection.recv(CHUNK_SIZE)
+            packet = self.connection.recv(min(CHUNK_SIZE, size))
             if not packet:
                 break
             full_data += packet
+        
+        if self.config['networking']['compression']:
+            import zlib
+
+            ti = time()
+            full_data = zlib.decompress(full_data)
+            log.warning(f'Compression time: {time() - ti} seconds')
+
         return full_data.decode()
 
     NUM_TRIANGLE_ATTRS = 9
@@ -175,5 +195,39 @@ class DarkRendererEdge():
         tri_end = self.num_tris * (self.NUM_TRIANGLE_ATTRS+1)
         self.triangle_ids = list(map(int, task_data[: self.num_tris]))
         self.triangles    = list(map(float, task_data[self.num_tris : tri_end]))
-        self.rays         = list(map(float, task_data[tri_end : ]))
+        
+        cam_data = task_data[tri_end : ]
+        res = (int(cam_data[0]), int(cam_data[1]))
+        float_data = list(map(float, cam_data[2:])) 
+        self.camera = Camera(res, 
+            np.array(float_data[:3]),
+            np.array(float_data[3:6]),
+            np.array(float_data[6:9]),
+            float_data[9], float_data[10])
+        self.rays = self.camera.get_rays(cpp_version=True)
 
+
+        Task.next_id = 0
+        tasks = self.divide_tasks(self.rays)
+        for t in tasks:
+            self.task_queue.put(t)
+        for _ in self.tracers:
+            self.task_queue.put(None)
+
+
+
+    def divide_tasks(self, rays):
+        num_rays = len(rays)//6
+        max_task_size = self.config['processing']['task_size']
+        number_of_tasks = int(np.ceil(num_rays/max_task_size))
+        ray_tasks = []
+        for i in range(1, number_of_tasks+1):
+            task_start = (i - 1) * max_task_size * 6
+            task_data = []
+            if i < number_of_tasks:
+                task_end = task_start + (max_task_size*6)
+                task_data = rays[task_start : task_end]
+            else:
+                task_data = rays[task_start : ]
+            ray_tasks.append(Task(task_data))
+        return ray_tasks

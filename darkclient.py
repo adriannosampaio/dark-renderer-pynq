@@ -4,25 +4,7 @@ import json
 import socket
 import struct
 import logging as log
-from application.parser import Parser
-
-class Session:
-	def __init__(self, input_filename, output_filename):
-		self.input_filename = input_filename
-		self.output_filename = output_filename
-		
-		self.input_file = open(input_filename, 'r')
-		line = self.input_file.readline().split()
-		self.num_tris = int(line[0])
-		self.num_rays = int(line[1])
-
-	def get_tris(self):
-		for i in range(self.num_tris):
-			yield self.input_file.readline()
-
-	def get_rays(self):
-		for i in range(self.num_rays):
-			yield self.input_file.readline()
+from time import time
 
 class DarkRendererClient:
 	'''	Class responsible for the DarkRenderer client behavior.
@@ -35,6 +17,7 @@ class DarkRendererClient:
 			socket.SOCK_STREAM)
 		self.config = config
 		
+		#self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 		edge_ip   = config['edge']['ip']
 		edge_port = config['edge']['port']
 		self.edge_addr = (edge_ip, edge_port)
@@ -64,39 +47,56 @@ class DarkRendererClient:
 		self._connect()
 
 		# preparing scene to send
+		ti = time()
 		num_tris, num_rays = len(scene.triangles), scene.camera.vres * scene.camera.hres
 		string_data  = f'{num_tris} {num_rays}\n' 
 		string_data += f'{scene.get_triangles_string()}\n' 
-		string_data += f'{scene.camera.get_rays_string()}'
+		string_data += f'{scene.camera.get_string()}'
+		tf = time()
+		log.warning(f'Parse scene time: {tf - ti} seconds')
 
 		# sending the scene	
 		self._send_scene_string(string_data)
 
 		log.info('Waiting for results')
+		ti = time()
 		result = self._receive_results()
-		log.info('Results received')
+		tf = time()
+		log.warning(f'Recv time: {tf - ti} seconds')
 
 		self._cleanup()
 		return result
 		
 	def _send_scene_string(self, string):
+		import zlib, time
 		log.info('Sending scene configuration')
-		size = len(string)
-		msg = struct.pack('>I', size) + string.encode()
-		self._send(msg)
+		encoded_msg = string.encode()
+		
+		size_msg = len(encoded_msg)
+		final_msg = encoded_msg
+		
+		if self.config['networking']['compression']:
+			ti = time.time()
+			final_msg = zlib.compress(encoded_msg)
+			size_msg = len(final_msg)
+			log.warning(f'Compression time: {time.time() - ti} seconds')
+			log.warning(f'sizes\n\t- encoded: {len(encoded_msg)}\n\t- compressed: {len(final_msg)}')
+		
+		final_msg = struct.pack('>I', size_msg) + final_msg
+		self._send(final_msg)
 		log.info("Configuration file sent")
 
 	def _receive_results(self):
 		log.info("Start receiving results")
-
 		raw_size = self.sock.recv(4)
 		size = struct.unpack('>I', raw_size)[0]
 		log.info(f'Finishing receiving scene file size: {size}B')
 
-		CHUNK_SIZE = 256
+		# 256kB
+		CHUNK_SIZE = self.config['networking']['recv_buffer_size']
 		full_data = b''
 		while len(full_data) < size:
-			packet = self._recv(CHUNK_SIZE)
+			packet = self._recv(min(size, CHUNK_SIZE))
 			if not packet:
 				break
 			full_data += packet
@@ -110,3 +110,4 @@ class DarkRendererClient:
 			msg = struct.pack('>I', size) + file.encode()
 			self._send(msg)
 		log.info("Configuration file sent")
+

@@ -1,6 +1,7 @@
 from .geometry import *
 from .light import *
 from .material import *
+from .bindings.utils import generate_rays
 import numpy as np
 
 def read_obj(filename):
@@ -89,12 +90,42 @@ class Camera():
 
 		self.v = np.cross(self.w, self.u)
 
+	def get_string(self):
+		res = f'{self.hres} {self.vres}\n'
+		res+= f'{str(self.eye_point)[1:-1]}\n'
+		res+= f'{str(self.look_point)[1:-1]}\n'
+		res+= f'{str(self.up_vec)[1:-1]}\n'
+		res+= f'{self.dist} {self.psize}'
+		return res
+
+
 	def get_ray(self, c, r):
 		xv = self.psize*(c - self.hres/2),
 		yv = self.psize*(r - self.vres/2);
 		d = xv*self.u + yv*self.v - self.dist*self.w
 		d /= np.linalg.norm(d)
 		return Ray(self.eye_point, d)
+
+	def get_rays(self, cpp_version=False):
+		out = []
+		if not cpp_version: 
+			for r in range(self.vres):
+				for c in range(self.hres):
+					xv = self.psize*(c - self.hres/2),
+					yv = self.psize*(r - self.vres/2);
+					rdir = xv*self.u + yv*self.v - self.dist*self.w
+					rdir /= np.linalg.norm(rdir)
+					out += list(self.eye_point)
+					out += list(rdir)
+		else:
+			out = generate_rays(
+				(self.hres, self.vres),
+				self.eye_point,
+				self.look_point,
+				self.up_vec,
+				self.dist,
+				self.psize)
+		return out
 
 	def get_rays_string(self):
 		out = ''
