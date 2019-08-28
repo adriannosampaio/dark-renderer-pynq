@@ -153,7 +153,7 @@ class TracerFPGA(TracerPYNQ):
 
         #overlay = Overlay('/home/xilinx/adrianno/intersect_fpga_x2.bit')
         overlay = Overlay(overlay_filename)
-        log.info('Finished loading overlay')
+        log.warning('Finished loading overlay')
         
         log.info('Initializing FPGA instances')
         self.accelerators.append(

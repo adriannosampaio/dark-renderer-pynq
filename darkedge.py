@@ -209,12 +209,8 @@ class DarkRendererEdge():
 
         Task.next_id = 0
         tasks = self.divide_tasks(self.rays)
-        print(f'Created {len(tasks)} tasks')
-        print(f'len(task 0) = {len(tasks[0])}')
         for t in tasks:
             self.task_queue.put(t)
-            print(t.id, len(t))
-
         for _ in self.tracers:
             self.task_queue.put(None)
 
@@ -234,5 +230,4 @@ class DarkRendererEdge():
             else:
                 task_data = rays[task_start : ]
             ray_tasks.append(Task(task_data))
-        print(*map(len, ray_tasks), sep=', ')
         return ray_tasks

@@ -68,19 +68,21 @@ def run_edge(config):
 
 def main():
 	mp.freeze_support()
+	mode = parser.args.mode
 	log.basicConfig(
+		filename=mode + '.log',
 		level=log.WARNING, 
 		format='%(levelname)s: [%(asctime)s] - %(message)s', 
 		datefmt='%d-%b-%y %H:%M:%S')
 	config = json.load(open("settings/default.json"))
 	log.info(f'Starting in {parser.args.mode} mode')
-	if parser.args.mode == 'client':
+	if mode == 'client':
 		for run in range(config['testing']['nruns']):
 			ti = time()
 			run_client(config)
 			log.warning(f'Client time: {time() - ti} seconds')
 			print()
-	elif parser.args.mode == 'edge':
+	elif mode == 'edge':
 		task_size = parser.args.task_size
 		if task_size is not None:
 			config['processing']['task_size'] = task_size 
