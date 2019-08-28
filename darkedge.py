@@ -208,7 +208,7 @@ class DarkRendererEdge():
 
 
         Task.next_id = 0
-        tasks = divide_tasks(self.rays)
+        tasks = self.divide_tasks(self.rays)
         print(f'Created {len(tasks)} tasks')
         print(f'len(task 0) = {len(tasks[0])}')
         for t in tasks:
@@ -220,19 +220,19 @@ class DarkRendererEdge():
 
 
 
-def divide_tasks(rays):
-    num_rays = len(rays)//6
-    max_task_size = 100000
-    number_of_tasks = int(np.ceil(num_rays/max_task_size))
-    ray_tasks = []
-    for i in range(1, number_of_tasks+1):
-        task_start = (i - 1) * max_task_size * 6
-        task_data = []
-        if i < number_of_tasks:
-            task_end = task_start + (max_task_size*6)
-            task_data = rays[task_start : task_end]
-        else:
-            task_data = rays[task_start : ]
-        ray_tasks.append(Task(task_data))
-    print(*map(len, ray_tasks), sep=', ')
-    return ray_tasks
+    def divide_tasks(self, rays):
+        num_rays = len(rays)//6
+        max_task_size = self.config['processing']['task_size']
+        number_of_tasks = int(np.ceil(num_rays/max_task_size))
+        ray_tasks = []
+        for i in range(1, number_of_tasks+1):
+            task_start = (i - 1) * max_task_size * 6
+            task_data = []
+            if i < number_of_tasks:
+                task_end = task_start + (max_task_size*6)
+                task_data = rays[task_start : task_end]
+            else:
+                task_data = rays[task_start : ]
+            ray_tasks.append(Task(task_data))
+        print(*map(len, ray_tasks), sep=', ')
+        return ray_tasks
