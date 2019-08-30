@@ -7,7 +7,7 @@ class Parser:
 
         self.parser.add_argument(
             '--mode', 
-            choices=['client', 'edge', 'master', 'node'],
+            choices=['client', 'edge', 'cloud', 'shutdown_edge', 'shutdown_all'],
             help='File containing the ray geometric information')
 
         self.parser.add_argument(
@@ -25,5 +25,10 @@ class Parser:
             '--task-size',
             type=int,
             help='Maximum size for processing tasks')
+
+        self.parser.add_argument(
+            '--config',
+            type=str,
+            help='Name of a configuration json file. [default.json if empty]')
 
         self.args = self.parser.parse_args()

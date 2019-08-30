@@ -20,6 +20,16 @@ class DarkRendererClient(ClientTCP):
 		edge_port = config['edge']['port']
 		self.edge_addr = (edge_ip, edge_port)
 
+	def shutdown_edge(self):
+		self.connect(self.edge_addr)
+		compression = self.config['networking']['compression']
+		self.send_msg('EXIT_EDGE', compression)
+	
+	def shutdown_all(self):
+		self.connect(self.edge_addr)
+		compression = self.config['networking']['compression']
+		self.send_msg('EXIT_ALL', compression)
+
 	def compute_scene(self, scene):
 		# connect to the edge node
 		self.connect(self.edge_addr)
@@ -35,17 +45,17 @@ class DarkRendererClient(ClientTCP):
 
 		# sending the scene	
 
-		compress = self.config['networking']['compression']
+		compression = self.config['networking']['compression']
 		log.info('Waiting for results')
 		ti = time()
-		self.send_msg(string_data, compress)
+		self.send_msg(string_data, compression)
 		tf = time()
-		log.warning(f'Recv time: {tf - ti} seconds')
+		log.warning(f'Send time: {tf - ti} seconds')
 
 
 		log.info('Waiting for results')
 		ti = time()
-		result = self.recv_msg(compress)
+		result = self.recv_msg(compression)
 		tf = time()
 		log.warning(f'Recv time: {tf - ti} seconds')
 
