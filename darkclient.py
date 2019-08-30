@@ -20,11 +20,15 @@ class DarkRendererClient(ClientTCP):
 		edge_port = config['edge']['port']
 		self.edge_addr = (edge_ip, edge_port)
 
-	def shutdown(self):
+	def shutdown_edge(self):
 		self.connect(self.edge_addr)
 		compression = self.config['networking']['compression']
-		self.send_msg('EXIT', compression)
+		self.send_msg('EXIT_EDGE', compression)
 	
+	def shutdown_all(self):
+		self.connect(self.edge_addr)
+		compression = self.config['networking']['compression']
+		self.send_msg('EXIT_ALL', compression)
 
 	def compute_scene(self, scene):
 		# connect to the edge node

@@ -75,10 +75,11 @@ class DarkRendererEdge(ServerTCP):
             log.info("Receiving scene file")
             ti = time()
             message = self.recv_msg(compression)
-            if message == 'EXIT': 
-                for tr in self.tracers:
-                    if type(tr) == tracer.TracerCloud:
-                        tr.shutdown()
+            if 'EXIT' in message: 
+                if message == 'EXIT_ALL':
+                    for tr in self.tracers:
+                        if type(tr) == tracer.TracerCloud:
+                            tr.shutdown()
                 break
             log.warning(f'Recv time: {time() - ti} seconds')
 

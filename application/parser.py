@@ -7,7 +7,7 @@ class Parser:
 
         self.parser.add_argument(
             '--mode', 
-            choices=['client', 'edge', 'cloud', 'shutdown'],
+            choices=['client', 'edge', 'cloud', 'shutdown_edge', 'shutdown_all'],
             help='File containing the ray geometric information')
 
         self.parser.add_argument(

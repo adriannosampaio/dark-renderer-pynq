@@ -90,7 +90,7 @@ def main():
 	
 
 	config_filename = None
-	if mode == 'shutdown':
+	if 'shutdown' in mode:
 		config_filename = "settings/client.json"
 	else:
 		config_filename = f"settings/{mode}.json"
@@ -117,9 +117,12 @@ def main():
 		run_edge(config)
 	elif mode == 'cloud':
 		run_cloud(config)
-	elif mode == 'shutdown':
-		DarkRendererClient(config=config).shutdown()
-
+	elif 'shutdown' in mode:
+		client = DarkRendererClient(config=config)
+		if mode == 'shutdown_all':
+			client.shutdown_all()
+		if mode == 'shutdown_edge':
+			client.shutdown_edge()
 
 
 if __name__ == '__main__':
