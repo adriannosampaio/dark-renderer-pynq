@@ -64,13 +64,13 @@ def run_edge(config):
 			dark_node.start()
 			print()
 	finally:
-		dark_node.cleanup()
+		dark_node.close()
 
 def main():
 	mp.freeze_support()
 	mode = parser.args.mode
 	log.basicConfig(
-		filename=mode + '.log',
+		# filename=mode + '.log',
 		level=log.WARNING, 
 		format='%(levelname)s: [%(asctime)s] - %(message)s', 
 		datefmt='%d-%b-%y %H:%M:%S')

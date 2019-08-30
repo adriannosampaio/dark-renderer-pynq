@@ -6,31 +6,24 @@ import application.tracers as tracer
 from application.parser import Parser
 from application.raytracer.scene import Camera
 from application.scheduling import Task, TaskResult
+from application.connection import ServerTCP
 import multiprocessing as mp
 from time import time
+from sortedcontainers import SortedDict
+from functools import reduce
 
 def save_intersections(filename, ids, intersects):
     with open(filename, 'w') as file:
         for tid, inter in zip(ids, intersects):
             file.write(f'{tid} {inter}\n')
 
-class DarkRendererEdge():
-
-    def __init__(self, config):        
-        
-        import socket as sk
-        self.sock = sk.socket(sk.AF_INET, sk.SOCK_STREAM)
+class DarkRendererEdge(ServerTCP):
+    def __init__(self, config):
         self.config = config
+        super().__init__(
+            (config['edge']['ip'], 
+            config['edge']['port']))
 
-        # Getting the current ip for binding
-        ip   = config['edge']['ip']
-        port = config['edge']['port']
-        self.addr = (ip, port)
-        self.sock.bind(self.addr)
-        
-        self.connection = None
-        self.client_ip = None
-        
         self.triangles    = []
         self.triangle_ids = []
         self.rays         = []
@@ -68,40 +61,31 @@ class DarkRendererEdge():
                 use_multi_fpga=use_multi_fpga)
             self.tracers.append(self.fpga_tracer)
         
-    def cleanup(self):
-        self.sock.close()
-        
     def start(self):
-
         log.info("Waiting for client connection")
-        self._await_connection()
+        self.listen()
         
+        compression = self.config['networking']['compression']
         log.info("Receiving scene file")
         ti = time()
-        scene_data = self._receive_scene_data()
-        tf = time()
-        log.warning(f'Recv time: {tf - ti} seconds')
+        scene_data = self.recv_msg(compression)
+        log.warning(f'Recv time: {time() - ti} seconds')
 
         log.info('Parsing scene data')
         ti = time()
         self._parse_scene_data(scene_data)
-        tf = time()
-        log.warning(f'Parse time: {tf - ti} seconds')
+        log.warning(f'Parse time: {time() - ti} seconds')
 
         log.info('Computing intersection')
         ti = time()
         result = self._compute()
-        tf = time()
-        log.warning(f'Intersection time: {tf - ti} seconds')
+        log.warning(f'Intersection time: {time() - ti} seconds')
 
         log.info('Preparing and sending results')
         ti = time()
         result = json.dumps(result)
-        size = len(result)
-        msg = struct.pack('>I', size) + result.encode()
-        self.connection.send(msg)
-        tf = time()
-        log.warning(f'Send time: in {tf - ti} seconds')
+        self.send_msg(result, compression)
+        log.warning(f'Send time: in {time() - ti} seconds')
 
     def _compute(self):
         import numpy as np
@@ -124,8 +108,6 @@ class DarkRendererEdge():
             p.start()
 
         tracers_finished = 0
-        from sortedcontainers import SortedDict
-        from functools import reduce
         ids_dict = SortedDict()
         intersect_dict = SortedDict() 
 
@@ -155,35 +137,6 @@ class DarkRendererEdge():
             'triangles_hit' : ids
         } 
 
-    def _await_connection(self):
-        self.sock.listen()
-        print('Waiting for connection...')
-        self.connection, self.current_client = self.sock.accept()
-        print(f"Connection with {self.current_client[0]}:{self.current_client[1]}")
-
-    def _receive_scene_data(self):
-        log.info("Start reading scene file content")
-        raw_size = self.connection.recv(4)
-        size = struct.unpack('>I', raw_size)[0]
-        log.info(f'Finishing receiving scene file size: {size}B')
-        
-        CHUNK_SIZE = self.config['networking']['recv_buffer_size']
-        full_data = b''
-        while len(full_data) < size:
-            packet = self.connection.recv(min(CHUNK_SIZE, size))
-            if not packet:
-                break
-            full_data += packet
-        
-        if self.config['networking']['compression']:
-            import zlib
-
-            ti = time()
-            full_data = zlib.decompress(full_data)
-            log.warning(f'Compression time: {time() - ti} seconds')
-
-        return full_data.decode()
-
     NUM_TRIANGLE_ATTRS = 9
     NUM_RAY_ATTRS = 6
 
@@ -205,8 +158,7 @@ class DarkRendererEdge():
             np.array(float_data[6:9]),
             float_data[9], float_data[10])
         self.rays = self.camera.get_rays(cpp_version=True)
-
-
+        
         Task.next_id = 0
         tasks = self.divide_tasks(self.rays)
         for t in tasks:
