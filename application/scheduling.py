@@ -8,9 +8,12 @@ class Counter():
         type(self).next_id = 0
 
 class Task(Counter):
-    def __init__(self, ray_data):
-        super().__init__()
+    def __init__(self, ray_data, task_id=None):
         self.ray_data = ray_data
+        if task_id is not None:
+            self.id = task_id
+        else:
+            super().__init__()
 
     def __len__(self):
         return len(self.ray_data)//6

@@ -2,6 +2,7 @@ import numpy as np
 import logging as log
 from time import time, sleep
 from .scheduling import TaskResult
+from .connection import ClientTCP
 
 class TracerPYNQ:
     MAX_DISTANCE = 1e9
@@ -16,13 +17,13 @@ class TracerPYNQ:
     def start(self, task_queue, result_queue):
         task = task_queue.get()
         while task is not None:
-            print(f'Processing task {task.id}')
+            log.info(f'Processing task {task.id}')
             out_ids, out_inter = self.compute(task.ray_data)
             result = TaskResult(
                 task.id,
                 out_ids,
                 out_inter)
-            result_queue.put(result)
+            result_queue.put(result, task_queue.qsize())
             task = task_queue.get()
         result_queue.put(None)
 
@@ -200,7 +201,6 @@ class TracerFPGA(TracerPYNQ):
                 self.tris)
         else:
             self.accelerators[0].compute(rays, tri_ids, tris)
-        
 
     def compute(self, rays):
         ''' Call the ray-triangle intersection FPGA accelerator
@@ -223,3 +223,49 @@ class TracerFPGA(TracerPYNQ):
             sleep(0.2)
 
         return self.get_results()
+
+
+
+class TracerCloud(TracerPYNQ, ClientTCP):
+    def __init__(self, cloud_addr, config):
+        super().__init__()
+        self.cloud_addr = cloud_addr
+        self.config = config
+        self.compression = config['networking']['compression']
+        
+
+    def shutdown(self):
+        self.connect(self.cloud_addr)
+        compression = self.config['networking']['compression']
+        self.send_msg('EXIT', compression)
+
+
+    def set_scene(self, tri_ids, triangles):
+        self.connect(self.cloud_addr)
+        scene = f'{len(tri_ids)}\n'
+        scene += f"{' '.join(map(str, tri_ids))} "
+        scene += f"{' '.join(map(str, triangles))}"
+        self.send_msg(scene, self.compression)
+
+    def compute(self, task):
+        task_msg = f'{task.id} '
+        task_msg += f"{' '.join(map(str, task.ray_data))}"
+        self.send_msg(task_msg, self.compression)
+
+        res = self.recv_msg(self.compression).split()
+        task_id = int(res[0])
+        num_rays = int(res[1])
+        out_ids = list(map(int, res[2:num_rays+2]))
+        out_inter = list(map(float, res[num_rays+2:]))
+        return TaskResult(task.id, out_ids, out_inter)
+
+    def start(self, task_queue, result_queue):
+        task = task_queue.get()
+        while task is not None:
+            log.info(f'Processing task {task.id}')
+            result = self.compute(task)
+            result_queue.put(result)
+            task = task_queue.get()
+        self.send_msg('END', self.compression)
+        result_queue.put(None)
+

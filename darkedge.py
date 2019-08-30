@@ -33,25 +33,30 @@ class DarkRendererEdge(ServerTCP):
         self.result_queue = mp.Queue()
 
         processing = config['processing']
-        mode = processing['mode']
-        self.heterogeneous_mode = (mode == 'heterogeneous')
-        self.cpu_active = mode in ['cpu', 'heterogeneous']
-        self.fpga_active = mode in ['fpga', 'heterogeneous']
+        self.cpu_active = processing['cpu']['active']
+        self.fpga_active = processing['fpga']['active']
+        self.cloud_active = processing['cloud']['active']
         
-        if self.heterogeneous_mode:
-            self.fpga_load_fraction = processing['heterogeneous']['fpga-load']
-
         self.tracers = []
 
+        if self.cloud_active:
+            cloud_addr = (
+                processing['cloud']['ip'], 
+                processing['cloud']['port'])
+
+            self.tracers.append(
+                tracer.TracerCloud(
+                    cloud_addr,
+                    config
+                )
+            )
+
         if self.cpu_active:
-            cpu_mode = processing['cpu']['mode']    
-            use_python = (cpu_mode == 'python')
+            cpu_mode = processing['cpu']['mode']
             use_multicore = (cpu_mode == 'multicore')
             self.cpu_tracer = tracer.TracerCPU(
                 use_multicore=use_multicore)
             self.tracers.append(self.cpu_tracer)
-            # self.tracers.append(tracer.TracerCPU(
-                # use_multicore=use_multicore))
 
         if self.fpga_active:
             fpga_mode = processing['fpga']['mode']
@@ -62,30 +67,36 @@ class DarkRendererEdge(ServerTCP):
             self.tracers.append(self.fpga_tracer)
         
     def start(self):
-        log.info("Waiting for client connection")
-        self.listen()
-        
-        compression = self.config['networking']['compression']
-        log.info("Receiving scene file")
-        ti = time()
-        scene_data = self.recv_msg(compression)
-        log.warning(f'Recv time: {time() - ti} seconds')
+        while True:
+            log.info("Waiting for client connection")
+            self.listen()
+            
+            compression = self.config['networking']['compression']
+            log.info("Receiving scene file")
+            ti = time()
+            message = self.recv_msg(compression)
+            if message == 'EXIT': 
+                for tr in self.tracers:
+                    if type(tr) == tracer.TracerCloud:
+                        tr.shutdown()
+                break
+            log.warning(f'Recv time: {time() - ti} seconds')
 
-        log.info('Parsing scene data')
-        ti = time()
-        self._parse_scene_data(scene_data)
-        log.warning(f'Parse time: {time() - ti} seconds')
+            log.info('Parsing scene data')
+            ti = time()
+            self._parse_scene_data(message)
+            log.warning(f'Parse time: {time() - ti} seconds')
 
-        log.info('Computing intersection')
-        ti = time()
-        result = self._compute()
-        log.warning(f'Intersection time: {time() - ti} seconds')
+            log.info('Computing intersection')
+            ti = time()
+            result = self._compute()
+            log.warning(f'Intersection time: {time() - ti} seconds')
 
-        log.info('Preparing and sending results')
-        ti = time()
-        result = json.dumps(result)
-        self.send_msg(result, compression)
-        log.warning(f'Send time: in {time() - ti} seconds')
+            log.info('Preparing and sending results')
+            ti = time()
+            result = json.dumps(result)
+            self.send_msg(result, compression)
+            log.warning(f'Send time: in {time() - ti} seconds')
 
     def _compute(self):
         import numpy as np
@@ -111,7 +122,7 @@ class DarkRendererEdge(ServerTCP):
         ids_dict = SortedDict()
         intersect_dict = SortedDict() 
 
-        print(f'num tracers = {len(self.tracers)}')
+        log.info(f'Number of tracers = {len(self.tracers)}')
         while tracers_finished < len(self.tracers):
             res = self.result_queue.get()
             if res is None:
@@ -158,7 +169,7 @@ class DarkRendererEdge(ServerTCP):
             np.array(float_data[6:9]),
             float_data[9], float_data[10])
         self.rays = self.camera.get_rays(cpp_version=True)
-        
+
         Task.next_id = 0
         tasks = self.divide_tasks(self.rays)
         for t in tasks:

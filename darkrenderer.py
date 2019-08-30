@@ -6,6 +6,7 @@ from time import time
 from application.parser import Parser
 from darkclient import DarkRendererClient
 from darkedge import DarkRendererEdge
+from darkcloud import DarkRendererCloud
 import multiprocessing as mp
 
 parser = Parser()
@@ -66,15 +67,42 @@ def run_edge(config):
 	finally:
 		dark_node.close()
 
+
+def run_cloud(config):
+	dark_cloud = DarkRendererCloud(config)
+	try:
+		for run in range(config['testing']['nruns']):
+			dark_cloud.start()
+			print()
+	finally:
+		dark_cloud.close()
+
+
+
 def main():
 	mp.freeze_support()
 	mode = parser.args.mode
 	log.basicConfig(
 		# filename=mode + '.log',
-		level=log.WARNING, 
+		level=log.DEBUG, 
 		format='%(levelname)s: [%(asctime)s] - %(message)s', 
 		datefmt='%d-%b-%y %H:%M:%S')
-	config = json.load(open("settings/default.json"))
+	
+
+	config_filename = None
+	if mode == 'shutdown':
+		config_filename = "settings/client.json"
+	else:
+		config_filename = f"settings/{mode}.json"
+	
+	config = json.load(
+		open(
+			config_filename
+			if parser.args.config is None
+			else parser.args.config
+		)
+	)
+
 	log.info(f'Starting in {parser.args.mode} mode')
 	if mode == 'client':
 		for run in range(config['testing']['nruns']):
@@ -87,7 +115,11 @@ def main():
 		if task_size is not None:
 			config['processing']['task_size'] = task_size 
 		run_edge(config)
-	
+	elif mode == 'cloud':
+		run_cloud(config)
+	elif mode == 'shutdown':
+		DarkRendererClient(config=config).shutdown()
+
 
 
 if __name__ == '__main__':
