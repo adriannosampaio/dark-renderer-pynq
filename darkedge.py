@@ -66,8 +66,7 @@ class DarkRendererEdge(ServerTCP):
             self.tracers.append(self.fpga_tracer)
         
     def start(self):
-        finished = False
-        while not finished:
+        while True:
             log.info("Waiting for client connection")
             self.listen()
             
@@ -80,7 +79,6 @@ class DarkRendererEdge(ServerTCP):
                     for tr in self.tracers:
                         if type(tr) == tracer.TracerCloud:
                             tr.shutdown()
-
                 break
 
             elif 'CONFIG' in message:
@@ -183,6 +181,7 @@ class DarkRendererEdge(ServerTCP):
 
         Task.next_id = 0
         tasks = self.divide_tasks(self.rays)
+        log.info(f'Generated {len(tasks)} tasks')
         for t in tasks:
             self.task_queue.put(t)
         for _ in self.tracers:
