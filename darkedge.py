@@ -5,12 +5,10 @@ import struct
 import application.tracers as tracer
 from application.parser import Parser
 from application.raytracer.scene import Camera
-from application.scheduling import Task, TaskResult
+from application.scheduling import Task
 from application.connection import ServerTCP
 import multiprocessing as mp
 from time import time
-from sortedcontainers import SortedDict
-from functools import reduce
 
 def save_intersections(filename, ids, intersects):
     with open(filename, 'w') as file:
@@ -31,6 +29,7 @@ class DarkRendererEdge(ServerTCP):
 
         self.task_queue = mp.Queue()
         self.result_queue = mp.Queue()
+        self.report_queue = mp.Queue()
 
         processing = config['processing']
         self.cpu_active = processing['cpu']['active']
@@ -104,7 +103,7 @@ class DarkRendererEdge(ServerTCP):
         log.info('Starting edge computation')
 
         processes = []
-        for tracer in self.tracers:
+        for counter, tracer in enumerate(self.tracers):
             tracer.set_scene(
                 self.triangle_ids,
                 self.triangles)
@@ -112,12 +111,13 @@ class DarkRendererEdge(ServerTCP):
             processes.append(
                 mp.Process(
                     target=tracer.start, 
-                    args=(self.task_queue, self.result_queue)
+                    args=(self.task_queue, 
+                        self.result_queue,
+                        self.report_queue)
                 )
             )
 
-        for p in processes:
-            p.start()
+        for p in processes: p.start()
 
         tracers_finished = 0
         results = []
@@ -130,15 +130,19 @@ class DarkRendererEdge(ServerTCP):
             else:
                 results.append(res)
 
-        for p in processes:
-            p.join()
-
+        for p in processes: p.join()
 
         triangles_hit = []
         intersections = []
         for res in sorted(results, key=lambda x : x.task_id):
             triangles_hit += res.triangles_hit
             intersections += res.intersections
+
+        summ_message = f'Processing summary:\n'
+        while not self.report_queue.empty():
+            summ = self.report_queue.get()
+            summ_message += f'\t- {str(summ)}\n'
+        log.warning(summ_message)
 
         return {
             'intersections' : intersections,

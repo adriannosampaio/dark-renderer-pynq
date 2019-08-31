@@ -42,9 +42,9 @@ class DarkRendererCloud(ServerTCP):
         
         msg = self.recv_msg(self.compression)
         while msg != 'END':
-            log.info(msg)
             msg = msg.split()
             task_id = int(msg[0])
+            print(f'Recived task {task_id}')
             ray_data = list(map(float, msg[1:]))
             self.task_queue.put(Task(ray_data, task_id))
             msg = self.recv_msg(self.compression)
