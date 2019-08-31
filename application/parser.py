@@ -24,7 +24,7 @@ class Parser:
         self.parser.add_argument(
             '--task-size',
             type=int,
-            help='Maximum size for processing tasks')
+            help='Maximum size of an edge task')
 
         self.parser.add_argument(
             '--config',

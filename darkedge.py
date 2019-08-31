@@ -66,7 +66,8 @@ class DarkRendererEdge(ServerTCP):
             self.tracers.append(self.fpga_tracer)
         
     def start(self):
-        while True:
+        finished = False
+        while not finished:
             log.info("Waiting for client connection")
             self.listen()
             
@@ -79,7 +80,16 @@ class DarkRendererEdge(ServerTCP):
                     for tr in self.tracers:
                         if type(tr) == tracer.TracerCloud:
                             tr.shutdown()
+
                 break
+
+            elif 'CONFIG' in message:
+                config_msg = message.split()[1:]
+                params = {}
+                for i, param in enumerate(config_msg):
+                    if param == 'TSIZE':
+                        self.config['processing']['task_size'] = int(config_msg[i + 1])
+                message = self.recv_msg(compression)
             log.warning(f'Recv time: {time() - ti} seconds')
 
             log.info('Parsing scene data')
@@ -183,6 +193,7 @@ class DarkRendererEdge(ServerTCP):
     def divide_tasks(self, rays):
         num_rays = len(rays)//6
         max_task_size = self.config['processing']['task_size']
+        log.info(f'Maximum task size: {max_task_size}')
         number_of_tasks = int(np.ceil(num_rays/max_task_size))
         ray_tasks = []
         for i in range(1, number_of_tasks+1):
