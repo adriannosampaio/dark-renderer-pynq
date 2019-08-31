@@ -120,8 +120,7 @@ class DarkRendererEdge(ServerTCP):
             p.start()
 
         tracers_finished = 0
-        ids_dict = SortedDict()
-        intersect_dict = SortedDict() 
+        results = []
 
         log.info(f'Number of tracers = {len(self.tracers)}')
         while tracers_finished < len(self.tracers):
@@ -129,24 +128,21 @@ class DarkRendererEdge(ServerTCP):
             if res is None:
                 tracers_finished += 1
             else:
-                task_id = res.task_id 
-                ids_dict[task_id] = res.triangles_hit
-                intersect_dict[task_id] = res.intersections
+                results.append(res)
 
         for p in processes:
             p.join()
 
-        ids = reduce(
-            lambda x, y : x + y,
-            ids_dict.values())
 
-        intersects = reduce(
-            lambda x, y : x + y,
-            intersect_dict.values())
+        triangles_hit = []
+        intersections = []
+        for res in sorted(results, key=lambda x : x.task_id):
+            triangles_hit += res.triangles_hit
+            intersections += res.intersections
 
         return {
-            'intersections' : intersects,
-            'triangles_hit' : ids
+            'intersections' : intersections,
+            'triangles_hit' : triangles_hit,
         } 
 
     NUM_TRIANGLE_ATTRS = 9
