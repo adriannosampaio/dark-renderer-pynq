@@ -162,6 +162,7 @@ class DarkRendererEdge(ServerTCP):
         log.info('Starting edge computation')
 
         processes = []
+        print(f"Use task stealing {self.config['processing']['task_steal']}")
         for tracer_id, tracer in enumerate(self.tracers):
             tracer.set_scene(
                 self.triangle_ids,

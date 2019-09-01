@@ -6,7 +6,7 @@
 	},
 
 	"edge" : {
-		"ip"   : "localhost",
+		"ip"   : "192.168.0.127",
 		"port" : 5002,
 		"bitstream" : "/home/xilinx/adrianno/intersect_fpga_x2.bit"
 	},
@@ -29,18 +29,18 @@
 		"cpu" : {
 			"_comment" : "cpu has 3 modes: python, singlecore and multicore",
 			"active" : true,
-			"mode" : "singlecore",
+			"mode" : "multicore",
 			"factor" : 0.4
 		},
 		"fpga" : {
 			"_comment" : "fpga has 2 modes: single and multi",
-			"active" : false,
+			"active" : true,
 			"mode" : "multi",
 			"factor" : 0.0
 		},
 		"cloud" : {
 			"active" : true,
-			"ip"   : "localhost",
+			"ip"   : "192.168.0.176",
 			"port" : 7502,
 			"factor" : 0.6,
 			"task_chunk_size" : 10

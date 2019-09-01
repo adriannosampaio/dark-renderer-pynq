@@ -92,8 +92,8 @@ def main():
 	mp.freeze_support()
 	mode = parser.args.mode
 	log.basicConfig(
-		filename=mode + '.log',
-		level=log.DEBUG, 
+		#filename=mode + '.log',
+		level=log.WARNING, 
 		format='%(levelname)s: [%(asctime)s] - %(message)s', 
 		datefmt='%d-%b-%y %H:%M:%S')
 	

@@ -27,7 +27,7 @@ class TracerPYNQ:
             if task is None: 
                 self.active_queues[i] = False
             else:
-                #print(f'{type(self).__name__}: Stealing task {task.id} from queue {i}')
+                print(f'{type(self).__name__}: Stealing task {task.id} from queue {i}')
                 break
         return task 
 
@@ -40,8 +40,8 @@ class TracerPYNQ:
             if task is None:
                 self.active_queues[main_queue] = False
             else:
+                print(f'{type(self).__name__}: Processing task {task.id}')
                 pass
-                #print(f'{type(self).__name__}: Processing task {task.id}')
 
         # if stealing is not active, return anyway
         if allow_stealing and task is None:
@@ -315,10 +315,10 @@ class TracerCloud(TracerPYNQ, ClientTCP):
                     self.send_task(task)
                     task_counter += 1
                 else:
-                    if not np.any(self.active_queues):
+                    if not allow_stealing or not np.any(self.active_queues):
                         finished = True
                     else:
-                        #print(f'{type(self).__name__}: Start stealing...')
+                        print(f'{type(self).__name__}: Start stealing...')
                         start_stealing = True
                     break
 
