@@ -13,7 +13,7 @@
 
 	"networking" : {
 		"recv_buffer_size" : 262144,
-		"compression" : false
+		"compression" : true
 	},
 
 	"testing" : {
@@ -23,21 +23,26 @@
 	"processing" : {
 		"_comment" : "3 modes: fpga, cpu, cloud and heterogeneous",
 		"_mode" : "cloud",
+		"multiqueue" : true,
 		"task_size" : 1000,
 		"cpu" : {
 			"_comment" : "cpu has 3 modes: python, singlecore and multicore",
 			"active" : true,
-			"mode" : "singlecore"
+			"mode" : "singlecore",
+			"factor" : 0.4
 		},
 		"fpga" : {
 			"_comment" : "fpga has 2 modes: single and multi",
 			"active" : false,
-			"mode" : "multi"
+			"mode" : "multi",
+			"factor" : 0.0
 		},
 		"cloud" : {
 			"active" : true,
 			"ip"   : "localhost",
-			"port" : 7502
+			"port" : 7502,
+			"factor" : 0.6,
+			"task_chunk_size" : 10
 		}
 	}
 }

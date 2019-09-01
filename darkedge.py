@@ -211,7 +211,6 @@ class DarkRendererEdge(ServerTCP):
         
         cam_data = task_data[tri_end : ]
         if cam_data[0] == 'CAM':
-            print(*cam_data)
             cam_data = cam_data[1:]
             res = (int(cam_data[0]), int(cam_data[1]))
             float_data = list(map(float, cam_data[2:])) 
@@ -222,7 +221,7 @@ class DarkRendererEdge(ServerTCP):
                 float_data[9], float_data[10])
             self.rays = self.camera.get_rays(cpp_version=True)
         else:
-            self.rays = list(map(float, cam_data[1:]))
+            self.rays = list(map(float, cam_data))
 
         Task.next_id = 0
         tasks = self.divide_tasks(self.rays)

@@ -53,7 +53,8 @@ class DarkRendererClient(ClientTCP):
 		if send_cam:
 			string_data += f'CAM {scene.camera.get_string()}'
 		else:
-			string_data += f'{scene.camera.get_rays_string()}'
+			rays = scene.camera.get_rays(cpp_version=True)
+			string_data += f'{" ".join(map(str, rays))}'
 
 		tf = time()
 		log.warning(f'Parse scene time: {tf - ti} seconds')
