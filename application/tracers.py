@@ -7,25 +7,60 @@ from .connection import ClientTCP
 class TracerPYNQ:
     MAX_DISTANCE = 1e9
     EPSILON = 1.0e-5
+    def __init__(self, tracer_id):
+        self.tracer_id = tracer_id
+
     def set_scene(self, tri_ids, triangles):
          self.tri_ids = tri_ids
          self.tris = triangles
+         self.active_queues = []
 
     def compute(self, rays):
         raise Exception('ERROR: Using abstract class')
 
-    def start(self, task_queue, result_queue, report_queue=None):
-        task = task_queue.get()
+    def steal_task(self, task_queues):
+        task = None
+        for i, q in enumerate(task_queues):
+            if self.active_queues[i]: 
+                task = task_queues[i].get()
+            
+            if task is None: 
+                self.active_queues[i] = False
+            else:
+                #print(f'{type(self).__name__}: Stealing task {task.id} from queue {i}')
+                break
+        return task 
+
+
+    def get_task(self, task_queues, main_queue, allow_stealing):
+        task = None
+        # if the main queue is active, get task from there
+        if self.active_queues[main_queue]:
+            task = task_queues[main_queue].get()
+            if task is None:
+                self.active_queues[main_queue] = False
+            else:
+                pass
+                #print(f'{type(self).__name__}: Processing task {task.id}')
+
+        # if stealing is not active, return anyway
+        if allow_stealing and task is None:
+            # if stealing is active and the task obtained is None
+            # start scanning other queues
+            task = self.steal_task(task_queues)
+        
+        return task
+
+    def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None):
+        self.active_queues= [True for _ in task_queues]
+        task = self.get_task(task_queues, main_queue_id, allow_stealing)
         report = TracerSummary(self)
         while task is not None:
-            print(f'{type(self).__name__}: Processing task {task.id}')
-            
             report.increment()
-
             out_ids, out_inter = self.compute(task.ray_data)
             result = TaskResult(task.id, out_ids, out_inter)
-            result_queue.put(result, task_queue.qsize())
-            task = task_queue.get()
+            result_queue.put(result)
+            task = self.get_task(task_queues, main_queue_id, allow_stealing)
         if report_queue is not None: report_queue.put(report)
         result_queue.put(None)
 
@@ -122,7 +157,8 @@ class XIntersectFPGA():
 
 
 class TracerCPU(TracerPYNQ):
-    def __init__(self, use_multicore: bool):
+    def __init__(self, tracer_id, use_multicore: bool):
+        super().__init__(tracer_id)
         self.use_multicore = use_multicore
 
     def compute(self, rays):
@@ -149,7 +185,8 @@ class TracerCPU(TracerPYNQ):
 
 
 class TracerFPGA(TracerPYNQ):
-    def __init__(self, overlay_filename: str, use_multi_fpga: bool = False):
+    def __init__(self, tracer_id, overlay_filename: str, use_multi_fpga: bool = False):
+        super().__init__(tracer_id)
         from pynq import Overlay
         self.use_multi_fpga = use_multi_fpga
         self.accelerators = []
@@ -229,8 +266,8 @@ class TracerFPGA(TracerPYNQ):
 
 
 class TracerCloud(TracerPYNQ, ClientTCP):
-    def __init__(self, cloud_addr, config):
-        super().__init__()
+    def __init__(self, tracer_id, cloud_addr, config):
+        super().__init__(tracer_id)
         self.cloud_addr = cloud_addr
         self.config = config
         self.compression = config['networking']['compression']
@@ -263,27 +300,32 @@ class TracerCloud(TracerPYNQ, ClientTCP):
         out_inter = list(map(float, res[num_rays+2:]))
         return TaskResult(task_id, out_ids, out_inter)
 
-    def start(self, task_queue, result_queue, report_queue=None):
+    def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None):
         report = TracerSummary(self)
         chunk_size = self.config['processing']['cloud']['task_chunk_size']
-        finished = False
+        self.active_queues= [True for _ in task_queues]
+        finished, start_stealing = False, False
         while not finished:
             task_counter = 0
+            print(*map(lambda x : x.qsize(), task_queues))
             for i in range(chunk_size):
-                task = task_queue.get()
+                task = self.get_task(task_queues, main_queue_id, start_stealing)
                 if task is not None:
-                    print(f'{type(self).__name__}: Processing task {task.id}')
                     report.increment()
                     self.send_task(task)
                     task_counter += 1
                 else:
-                    finished = True
+                    if not np.any(self.active_queues):
+                        finished = True
+                    else:
+                        #print(f'{type(self).__name__}: Start stealing...')
+                        start_stealing = True
                     break
 
-            print(f'waiting for {task_counter} tasks')
+            #print(f'waiting for {task_counter} tasks')
             for i in range(task_counter):
                 result = self.receive_result()
-                print(f'Received task {result.task_id} results')
+                #print(f'Received task {result.task_id} results')
                 result_queue.put(result)
         self.send_msg('END', self.compression)
         if report_queue is not None: report_queue.put(report)

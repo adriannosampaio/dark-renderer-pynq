@@ -32,8 +32,7 @@ class DarkRendererCloud(ServerTCP):
         self.tracers = []
         cpu_mode = processing['cpu']['mode']
         use_multicore = (cpu_mode == 'multicore')
-        self.tracers.append(
-            tracer.TracerCPU(use_multicore))
+        self.tracers.append(tracer.TracerCPU(0, use_multicore))
     
     def task_receiver(self, task_queue):
         # Receive a task in the shape
@@ -110,7 +109,11 @@ class DarkRendererCloud(ServerTCP):
             processes.append(
                 mp.Process(
                     target=tracer.start, 
-                    args=(self.task_queue, self.result_queue)
+                    args=(
+                        self.result_queue,
+                        [self.task_queue],
+                        0,
+                        False)
                 )
             )
 

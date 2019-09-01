@@ -30,7 +30,10 @@ class DarkRendererClient(ClientTCP):
 		compression = self.config['networking']['compression']
 		self.send_msg('EXIT_ALL', compression)
 
-	def compute_scene(self, scene, task_size=None, task_chunk_size=None, multiqueue=None, send_cam=False):
+	def compute_scene(self, scene, 
+		task_size, task_chunk_size, 
+		multiqueue, send_cam,
+		task_stealing):
 		# connect to the edge node
 		compression = self.config['networking']['compression']
 		self.connect(self.edge_addr)
@@ -42,6 +45,8 @@ class DarkRendererClient(ClientTCP):
 			config_msg += f'TCHUNKSIZE {task_chunk_size} '
 		if multiqueue is not None:
 			config_msg += f'MULTIQUEUE {int(multiqueue)} '
+		if task_stealing is not None:
+			config_msg += f'STEAL {int(task_stealing)} '
 		print(config_msg)
 		self.send_msg(config_msg, compression)
 

@@ -25,6 +25,7 @@
 		"_mode" : "cloud",
 		"multiqueue" : true,
 		"task_size" : 1000,
+		"task_steal" : false,
 		"cpu" : {
 			"_comment" : "cpu has 3 modes: python, singlecore and multicore",
 			"active" : true,

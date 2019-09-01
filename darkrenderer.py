@@ -42,6 +42,7 @@ def run_client(config):
 			parser.args.task_chunk_size,
 			parser.args.multiqueue,
 			parser.args.send_cam,
+			parser.args.task_stealing,
 		)
 	)
 	log.warning(f'Intersection time: {time() - ti} seconds')
@@ -91,7 +92,7 @@ def main():
 	mp.freeze_support()
 	mode = parser.args.mode
 	log.basicConfig(
-		# filename=mode + '.log',
+		filename=mode + '.log',
 		level=log.DEBUG, 
 		format='%(levelname)s: [%(asctime)s] - %(message)s', 
 		datefmt='%d-%b-%y %H:%M:%S')

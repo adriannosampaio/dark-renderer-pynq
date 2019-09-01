@@ -42,22 +42,25 @@ class DarkRendererEdge(ServerTCP):
         self.tracer_fractions = []
 
         self.multiqueue = processing['multiqueue']
-
+        tracer_id = 0
 
         if self.cloud_active:
             cloud_addr = (
                 processing['cloud']['ip'], 
                 processing['cloud']['port'])
+
             if self.multiqueue:
                 self.tracer_fractions.append(
                     self.config['processing']['cloud']['factor'])
 
             self.tracers.append(
                 tracer.TracerCloud(
+                    tracer_id,
                     cloud_addr,
                     config
                 )
             )
+            tracer_id += 1
 
         if self.cpu_active:
             cpu_mode = processing['cpu']['mode']
@@ -68,7 +71,10 @@ class DarkRendererEdge(ServerTCP):
                     self.config['processing']['cpu']['factor'])
 
             self.cpu_tracer = tracer.TracerCPU(
+                tracer_id,
                 use_multicore=use_multicore)
+
+            tracer_id += 1
 
             self.tracers.append(self.cpu_tracer)
 
@@ -81,9 +87,10 @@ class DarkRendererEdge(ServerTCP):
                     self.config['processing']['fpga']['factor'])
 
             self.fpga_tracer = tracer.TracerFPGA(
+                tracer_id,
                 config['edge']['bitstream'],
                 use_multi_fpga=use_multi_fpga)
-            
+            tracer_id += 1
             self.tracers.append(self.fpga_tracer)
 
         if self.multiqueue:
@@ -122,6 +129,10 @@ class DarkRendererEdge(ServerTCP):
                         print(value)
                         self.config['processing']['multiqueue'] = value
                         self.multiqueue = value
+                    elif param == 'STEAL':
+                        value = bool(int(config_msg[i + 1]))
+                        print(value)
+                        self.config['processing']['task_steal'] = value
 
                 message = self.recv_msg(compression)
             log.warning(f'Recv time: {time() - ti} seconds')
@@ -155,13 +166,16 @@ class DarkRendererEdge(ServerTCP):
             tracer.set_scene(
                 self.triangle_ids,
                 self.triangles)
-
+            
+            allow_stealing = self.config['processing']['task_steal']
             processes.append(
                 mp.Process(
                     target=tracer.start, 
                     args=(
-                        self.task_queues[tracer_id if self.multiqueue else 0], 
                         self.result_queue,
+                        self.task_queues,
+                        tracer_id if self.multiqueue else 0,
+                        allow_stealing, 
                         self.report_queue)
                 )
             )

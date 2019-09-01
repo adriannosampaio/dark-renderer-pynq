@@ -34,7 +34,12 @@ class Parser:
         self.parser.add_argument(
             '--multiqueue',
             action='store_true',
-            help='Use multiple queues on the edge')
+            help='Use multiple queues on the edge')        
+
+        self.parser.add_argument(
+            '--task-stealing',
+            action='store_true',
+            help='Allow task stealing on the edge')
 
         self.parser.add_argument(
             '--send-cam',
