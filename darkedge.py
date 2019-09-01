@@ -112,7 +112,17 @@ class DarkRendererEdge(ServerTCP):
                 params = {}
                 for i, param in enumerate(config_msg):
                     if param == 'TSIZE':
-                        self.config['processing']['task_size'] = int(config_msg[i + 1])
+                        value = int(config_msg[i + 1])
+                        self.config['processing']['task_size'] = value
+                    elif param == 'TCHUNKSIZE':
+                        value = int(config_msg[i + 1])
+                        self.config['processing']['cloud']['task_chunk_size'] = value
+                    elif param == 'MULTIQUEUE':
+                        value = bool(int(config_msg[i + 1]))
+                        print(value)
+                        self.config['processing']['multiqueue'] = value
+                        self.multiqueue = value
+
                 message = self.recv_msg(compression)
             log.warning(f'Recv time: {time() - ti} seconds')
 
@@ -131,6 +141,10 @@ class DarkRendererEdge(ServerTCP):
             result = json.dumps(result)
             self.send_msg(result, compression)
             log.warning(f'Send time: in {time() - ti} seconds')
+
+            # for q in self.task_queues:
+            #     while not q.empty():
+            #         q.get() 
 
     def _compute(self):
         import numpy as np
@@ -172,10 +186,10 @@ class DarkRendererEdge(ServerTCP):
             triangles_hit += res.triangles_hit
             intersections += res.intersections
 
-        summ_message = f'Processing summary:\n'
+        summ_message = f'Processing report: '
         while not self.report_queue.empty():
             summ = self.report_queue.get()
-            summ_message += f'\t- {str(summ)}\n'
+            summ_message += f'{str(summ)} | '
         log.warning(summ_message)
 
         return {
@@ -210,23 +224,27 @@ class DarkRendererEdge(ServerTCP):
 
         task_pointer = 0
         number_of_tasks = len(tasks)
-        log.info(f'Generated {len(tasks)} tasks')
 
+        self.task_queues.clear()
         if self.multiqueue:
-            for tracer_id, _ in enumerate(self.tracers):
+            for _ in self.tracers:
                 self.task_queues.append(mp.Queue())
-                block_size = round(self.tracer_fractions[tracer_id] * number_of_tasks)
-                next_pointer = task_pointer + block_size
-                for t in tasks[task_pointer:next_pointer]:
-                    self.task_queues[tracer_id].put(t)
-                task_pointer = next_pointer
-                self.task_queues[tracer_id].put(None)
+            for tid, t in enumerate(tasks):
+                queue_id = tid % len(self.tracers)
+                self.task_queues[queue_id].put(t)
         else:
             self.task_queues.append(mp.Queue())
             for t in tasks:
                 self.task_queues[0].put(t)
+        
+        for q in self.task_queues:
             for _ in self.tracers:
-                self.task_queues[0].put(None)
+                q.put(None)
+
+        setup_report = 'Setup report:'
+        setup_report += f'Generated {len(tasks)} tasks | '
+        setup_report += f'Using {len(self.task_queues)} queue(s)'
+        log.info(setup_report)
 
 
 
