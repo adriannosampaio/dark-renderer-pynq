@@ -156,7 +156,6 @@ class DarkRendererEdge(ServerTCP):
 
         tracers_finished = 0
         results = []
-
         log.info(f'Number of tracers = {len(self.tracers)}')
         while tracers_finished < len(self.tracers):
             res = self.result_queue.get()
@@ -216,7 +215,7 @@ class DarkRendererEdge(ServerTCP):
         if self.multiqueue:
             for tracer_id, _ in enumerate(self.tracers):
                 self.task_queues.append(mp.Queue())
-                block_size = int(self.tracer_fractions[tracer_id] * number_of_tasks)
+                block_size = round(self.tracer_fractions[tracer_id] * number_of_tasks)
                 next_pointer = task_pointer + block_size
                 for t in tasks[task_pointer:next_pointer]:
                     self.task_queues[tracer_id].put(t)
