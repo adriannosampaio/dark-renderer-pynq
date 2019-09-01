@@ -31,17 +31,26 @@ class DarkRendererEdge(ServerTCP):
         self.result_queue = mp.Queue()
         self.report_queue = mp.Queue()
 
+        self.task_queues = []
+
         processing = config['processing']
         self.cpu_active = processing['cpu']['active']
         self.fpga_active = processing['fpga']['active']
         self.cloud_active = processing['cloud']['active']
         
         self.tracers = []
+        self.tracer_fractions = []
+
+        self.multiqueue = processing['multiqueue']
+
 
         if self.cloud_active:
             cloud_addr = (
                 processing['cloud']['ip'], 
                 processing['cloud']['port'])
+            if self.multiqueue:
+                self.tracer_fractions.append(
+                    self.config['processing']['cloud']['factor'])
 
             self.tracers.append(
                 tracer.TracerCloud(
@@ -53,17 +62,34 @@ class DarkRendererEdge(ServerTCP):
         if self.cpu_active:
             cpu_mode = processing['cpu']['mode']
             use_multicore = (cpu_mode == 'multicore')
+
+            if self.multiqueue:
+                self.tracer_fractions.append(
+                    self.config['processing']['cpu']['factor'])
+
             self.cpu_tracer = tracer.TracerCPU(
                 use_multicore=use_multicore)
+
             self.tracers.append(self.cpu_tracer)
 
         if self.fpga_active:
             fpga_mode = processing['fpga']['mode']
             use_multi_fpga = (fpga_mode == 'multi')
+
+            if self.multiqueue:
+                self.tracer_fractions.append(
+                    self.config['processing']['fpga']['factor'])
+
             self.fpga_tracer = tracer.TracerFPGA(
                 config['edge']['bitstream'],
                 use_multi_fpga=use_multi_fpga)
+            
             self.tracers.append(self.fpga_tracer)
+
+        if self.multiqueue:
+            if not np.isclose(np.sum(self.tracer_fractions), 1.0):
+                log.warning("The processing percentage does not amount to 100%")
+
         
     def start(self):
         while True:
@@ -111,7 +137,7 @@ class DarkRendererEdge(ServerTCP):
         log.info('Starting edge computation')
 
         processes = []
-        for counter, tracer in enumerate(self.tracers):
+        for tracer_id, tracer in enumerate(self.tracers):
             tracer.set_scene(
                 self.triangle_ids,
                 self.triangles)
@@ -119,7 +145,8 @@ class DarkRendererEdge(ServerTCP):
             processes.append(
                 mp.Process(
                     target=tracer.start, 
-                    args=(self.task_queue, 
+                    args=(
+                        self.task_queues[tracer_id if self.multiqueue else 0], 
                         self.result_queue,
                         self.report_queue)
                 )
@@ -181,11 +208,26 @@ class DarkRendererEdge(ServerTCP):
 
         Task.next_id = 0
         tasks = self.divide_tasks(self.rays)
+
+        task_pointer = 0
+        number_of_tasks = len(tasks)
         log.info(f'Generated {len(tasks)} tasks')
-        for t in tasks:
-            self.task_queue.put(t)
-        for _ in self.tracers:
-            self.task_queue.put(None)
+
+        if self.multiqueue:
+            for tracer_id, _ in enumerate(self.tracers):
+                self.task_queues.append(mp.Queue())
+                block_size = int(self.tracer_fractions[tracer_id] * number_of_tasks)
+                next_pointer = task_pointer + block_size
+                for t in tasks[task_pointer:next_pointer]:
+                    self.task_queues[tracer_id].put(t)
+                task_pointer = next_pointer
+                self.task_queues[tracer_id].put(None)
+        else:
+            self.task_queues.append(mp.Queue())
+            for t in tasks:
+                self.task_queues[0].put(t)
+            for _ in self.tracers:
+                self.task_queues[0].put(None)
 
 
 

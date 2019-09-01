@@ -59,7 +59,6 @@ class DarkRendererCloud(ServerTCP):
         tracers_finished = 0
         log.info(f'num tracers = {len(self.tracers)}')
         while tracers_finished < len(self.tracers):
-            # print(tracers_finished)
             res = result_queue.get()
             if res is None:
                 tracers_finished += 1

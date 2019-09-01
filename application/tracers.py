@@ -284,7 +284,6 @@ class TracerCloud(TracerPYNQ, ClientTCP):
             for i in range(task_counter):
                 result = self.receive_result()
                 print(f'Received task {result.task_id} results')
-                print(result.triangles_hit[:20])
                 result_queue.put(result)
         self.send_msg('END', self.compression)
         if report_queue is not None: report_queue.put(report)
