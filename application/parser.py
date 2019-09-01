@@ -33,8 +33,13 @@ class Parser:
 
         self.parser.add_argument(
             '--multiqueue',
-            type=int,
+            action='store_true',
             help='Use multiple queues on the edge')
+
+        self.parser.add_argument(
+            '--send-cam',
+            action='store_true',
+            help='Send camera to the edge instead of the rays')
 
         self.parser.add_argument(
             '--config',

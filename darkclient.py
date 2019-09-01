@@ -30,7 +30,7 @@ class DarkRendererClient(ClientTCP):
 		compression = self.config['networking']['compression']
 		self.send_msg('EXIT_ALL', compression)
 
-	def compute_scene(self, scene, task_size=None, task_chunk_size=None, multiqueue=None):
+	def compute_scene(self, scene, task_size=None, task_chunk_size=None, multiqueue=None, send_cam=False):
 		# connect to the edge node
 		compression = self.config['networking']['compression']
 		self.connect(self.edge_addr)
@@ -50,7 +50,11 @@ class DarkRendererClient(ClientTCP):
 		num_tris, num_rays = len(scene.triangles), scene.camera.vres * scene.camera.hres
 		string_data  = f'{num_tris} {num_rays}\n' 
 		string_data += f'{scene.get_triangles_string()}\n' 
-		string_data += f'{scene.camera.get_string()}'
+		if send_cam:
+			string_data += f'CAM {scene.camera.get_string()}'
+		else:
+			string_data += f'{scene.camera.get_rays_string()}'
+
 		tf = time()
 		log.warning(f'Parse scene time: {tf - ti} seconds')
 

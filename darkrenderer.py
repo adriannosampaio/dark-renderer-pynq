@@ -40,10 +40,10 @@ def run_client(config):
 			scene, 
 			parser.args.task_size,
 			parser.args.task_chunk_size,
-			parser.args.multiqueue
+			parser.args.multiqueue,
+			parser.args.send_cam,
 		)
 	)
-
 	log.warning(f'Intersection time: {time() - ti} seconds')
 	
 	ti = time()

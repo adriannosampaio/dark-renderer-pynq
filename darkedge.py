@@ -210,14 +210,19 @@ class DarkRendererEdge(ServerTCP):
         self.triangles    = list(map(float, task_data[self.num_tris : tri_end]))
         
         cam_data = task_data[tri_end : ]
-        res = (int(cam_data[0]), int(cam_data[1]))
-        float_data = list(map(float, cam_data[2:])) 
-        self.camera = Camera(res, 
-            np.array(float_data[:3]),
-            np.array(float_data[3:6]),
-            np.array(float_data[6:9]),
-            float_data[9], float_data[10])
-        self.rays = self.camera.get_rays(cpp_version=True)
+        if cam_data[0] == 'CAM':
+            print(*cam_data)
+            cam_data = cam_data[1:]
+            res = (int(cam_data[0]), int(cam_data[1]))
+            float_data = list(map(float, cam_data[2:])) 
+            self.camera = Camera(res, 
+                np.array(float_data[:3]),
+                np.array(float_data[3:6]),
+                np.array(float_data[6:9]),
+                float_data[9], float_data[10])
+            self.rays = self.camera.get_rays(cpp_version=True)
+        else:
+            self.rays = list(map(float, cam_data[1:]))
 
         Task.next_id = 0
         tasks = self.divide_tasks(self.rays)
