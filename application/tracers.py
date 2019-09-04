@@ -1,7 +1,7 @@
 import numpy as np 
 import logging as log
 from time import time, sleep
-from .scheduling import TaskResult, TracerSummary
+from .scheduling import TaskResult, TracerSummary, SuperTask
 from .connection import ClientTCP
 
 class TracerPYNQ:
@@ -57,8 +57,8 @@ class TracerPYNQ:
         report = TracerSummary(self)
         while task is not None:
             report.increment()
-            out_ids, out_inter = self.compute(task.ray_data)
-            result = TaskResult(task.id, out_ids, out_inter)
+            out_ids, out_inter = self.compute(list(map(float,task.ray_data)))
+            result = TaskResult(task.id, list(map(str,out_ids)), list(map(str,out_inter)))
             result_queue.put(result)
             task = self.get_task(task_queues, main_queue_id, allow_stealing)
         if report_queue is not None: report_queue.put(report)
@@ -289,15 +289,15 @@ class TracerCloud(TracerPYNQ, ClientTCP):
 
     def send_task(self, task):
         task_msg = f'{task.id}\n'
-        task_msg += f"{' '.join(map(str, task.ray_data))}"
+        task_msg += f"{' '.join(task.ray_data)}"
         self.send_msg(task_msg, self.compression)
 
     def receive_result(self):
         res = self.recv_msg(self.compression).split()
         task_id = int(res[0])
         num_rays = int(res[1])
-        out_ids = list(map(int, res[2:num_rays+2]))
-        out_inter = list(map(float, res[num_rays+2:]))
+        out_ids = res[2:num_rays+2]
+        out_inter = res[num_rays+2:]
         return TaskResult(task_id, out_ids, out_inter)
 
     def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None):
@@ -308,11 +308,12 @@ class TracerCloud(TracerPYNQ, ClientTCP):
         while not finished:
             task_counter = 0
             print(*map(lambda x : x.qsize(), task_queues))
+            super_task = SuperTask()
             for i in range(chunk_size):
                 task = self.get_task(task_queues, main_queue_id, start_stealing)
                 if task is not None:
                     report.increment()
-                    self.send_task(task)
+                    super_task.add_task(task)
                     task_counter += 1
                 else:
                     if not allow_stealing or not np.any(self.active_queues):
@@ -321,12 +322,10 @@ class TracerCloud(TracerPYNQ, ClientTCP):
                         print(f'{type(self).__name__}: Start stealing...')
                         start_stealing = True
                     break
-
-            #print(f'waiting for {task_counter} tasks')
-            for i in range(task_counter):
-                result = self.receive_result()
-                #print(f'Received task {result.task_id} results')
-                result_queue.put(result)
+            self.send_task(super_task)
+            result = super_task.separate_results(self.receive_result())
+            for r in result:
+                result_queue.put(r)
         self.send_msg('END', self.compression)
         if report_queue is not None: report_queue.put(report)
         result_queue.put(None)

@@ -18,6 +18,38 @@ class Task(Counter):
     def __len__(self):
         return len(self.ray_data)//6
 
+
+class SuperTask(Counter):
+    def __init__(self):
+        super().__init__()
+        self.ids = []
+        self.sizes = []
+        self.ray_data = []
+
+    def add_task(self, task):
+        self.ids.append(task.id)
+        self.sizes.append(len(task))
+        self.ray_data += task.ray_data
+
+    def separate_results(self, result):
+        if result.task_id != self.id:
+            raise Exception("Id ERROR")
+        res = []
+        ray_ptr = 0
+        for i, sz in zip(self.ids, self.sizes):
+            res.append(
+                TaskResult(
+                    i,
+                    result.triangles_hit[ray_ptr : ray_ptr + sz],
+                    result.intersections[ray_ptr : ray_ptr + sz] 
+                ))
+            ray_ptr += sz
+        return res
+
+
+
+
+
 class TaskResult():
     """docstring for Result"""
     def __init__(self, task_id, triangles_hit, intersections):
