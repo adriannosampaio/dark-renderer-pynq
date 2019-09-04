@@ -58,7 +58,7 @@ class TracerPYNQ:
         while task is not None:
             report.increment()
             out_ids, out_inter = self.compute(list(map(float,task.ray_data)))
-            result = TaskResult(task.id, out_ids, out_inter)
+            result = TaskResult(task.id, list(map(str,out_ids)), list(map(str,out_inter)))
             result_queue.put(result)
             task = self.get_task(task_queues, main_queue_id, allow_stealing)
         if report_queue is not None: report_queue.put(report)
@@ -296,8 +296,8 @@ class TracerCloud(TracerPYNQ, ClientTCP):
         res = self.recv_msg(self.compression).split()
         task_id = int(res[0])
         num_rays = int(res[1])
-        out_ids = list(map(int, res[2:num_rays+2]))
-        out_inter = list(map(float, res[num_rays+2:]))
+        out_ids = res[2:num_rays+2]
+        out_inter = res[num_rays+2:]
         return TaskResult(task_id, out_ids, out_inter)
 
     def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None):
@@ -312,10 +312,8 @@ class TracerCloud(TracerPYNQ, ClientTCP):
             for i in range(chunk_size):
                 task = self.get_task(task_queues, main_queue_id, start_stealing)
                 if task is not None:
-                    print("got task", task.id)
                     report.increment()
                     super_task.add_task(task)
-                    print('task chunk:', *super_task.ids)
                     task_counter += 1
                 else:
                     if not np.any(self.active_queues):
@@ -326,10 +324,7 @@ class TracerCloud(TracerPYNQ, ClientTCP):
                     break
             self.send_task(super_task)
             result = super_task.separate_results(self.receive_result())
-            print(len(result))
-            #print(f'waiting for {task_counter} tasks')
             for r in result:
-                #print(f'Received task {result.task_id} results')
                 result_queue.put(r)
         self.send_msg('END', self.compression)
         if report_queue is not None: report_queue.put(report)

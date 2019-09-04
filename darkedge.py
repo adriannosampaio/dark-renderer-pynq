@@ -104,6 +104,7 @@ class DarkRendererEdge(ServerTCP):
             self.listen()
             
             compression = self.config['networking']['compression']
+            self.compression = self.config['networking']['compression']
             log.info("Receiving scene file")
             ti = time()
             message = self.recv_msg(compression)
@@ -144,18 +145,15 @@ class DarkRendererEdge(ServerTCP):
 
             log.info('Computing intersection')
             ti = time()
-            result = self._compute()
+            self._compute()
             log.warning(f'Intersection time: {time() - ti} seconds')
 
-            log.info('Preparing and sending results')
-            ti = time()
-            result = json.dumps(result)
-            self.send_msg(result, compression)
-            log.warning(f'Send time: in {time() - ti} seconds')
+    def send_result(self, result):
+        message = f'{result.task_id} {len(result.triangles_hit)} '
+        message += ' '.join(result.triangles_hit) + ' '
+        message += ' '.join(result.intersections)
+        self.send_msg(message, self.compression)
 
-            # for q in self.task_queues:
-            #     while not q.empty():
-            #         q.get() 
 
     def _compute(self):
         import numpy as np
@@ -190,15 +188,9 @@ class DarkRendererEdge(ServerTCP):
             if res is None:
                 tracers_finished += 1
             else:
-                results.append(res)
+                self.send_result(res)
 
         for p in processes: p.join()
-
-        triangles_hit = []
-        intersections = []
-        for res in sorted(results, key=lambda x : x.task_id):
-            triangles_hit += res.triangles_hit
-            intersections += res.intersections
 
         summ_message = f'Processing report: '
         while not self.report_queue.empty():
@@ -206,10 +198,6 @@ class DarkRendererEdge(ServerTCP):
             summ_message += f'{str(summ)} | '
         log.warning(summ_message)
 
-        return {
-            'intersections' : intersections,
-            'triangles_hit' : triangles_hit,
-        } 
 
     NUM_TRIANGLE_ATTRS = 9
     NUM_RAY_ATTRS = 6
