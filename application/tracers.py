@@ -57,7 +57,7 @@ class TracerPYNQ:
         report = TracerSummary(self)
         while task is not None:
             report.increment()
-            out_ids, out_inter = self.compute(task.ray_data)
+            out_ids, out_inter = self.compute(list(map(float,task.ray_data)))
             result = TaskResult(task.id, out_ids, out_inter)
             result_queue.put(result)
             task = self.get_task(task_queues, main_queue_id, allow_stealing)
@@ -289,7 +289,7 @@ class TracerCloud(TracerPYNQ, ClientTCP):
 
     def send_task(self, task):
         task_msg = f'{task.id}\n'
-        task_msg += f"{' '.join(map(str, task.ray_data))}"
+        task_msg += f"{' '.join(task.ray_data)}"
         self.send_msg(task_msg, self.compression)
 
     def receive_result(self):
