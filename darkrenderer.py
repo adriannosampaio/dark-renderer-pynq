@@ -86,13 +86,14 @@ def run_cloud(config):
 	finally:
 		dark_cloud.close()
 
-
+import sys
 
 def main():
 	mp.freeze_support()
 	mode = parser.args.mode
 	log.basicConfig(
 		#filename=mode + '.log',
+		stream=sys.stdout,
 		level=log.WARNING, 
 		format='%(levelname)s: [%(asctime)s] - %(message)s', 
 		datefmt='%d-%b-%y %H:%M:%S')

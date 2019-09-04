@@ -82,7 +82,7 @@ class DarkRendererClient(ClientTCP):
         for i in range(int(task_number)):
             res_msg = self.recv_msg(compression).split()
             task_id = int(res_msg[0])
-            log.warning(f'Receiving result {task_id}')
+            log.debug(f'Receiving result {task_id}')
             task_sz = int(res_msg[1])
             out_ids = list(map(int, res_msg[2:2+task_sz]))
             out_its = list(map(float, res_msg[2+task_sz:]))
