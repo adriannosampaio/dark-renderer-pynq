@@ -6,8 +6,8 @@
 	},
 
 	"edge" : {
-		"ip"   : "192.168.0.127",
-		"port" : 5002,
+		"ip"   : "",
+		"port" : 5000,
 		"bitstream" : "/home/xilinx/adrianno/intersect_fpga_x2.bit"
 	},
 
@@ -40,8 +40,8 @@
 		},
 		"cloud" : {
 			"active" : true,
-			"ip"   : "192.168.0.176",
-			"port" : 7502,
+			"ip"   : "35.247.206.234",
+			"port" : 6000,
 			"factor" : 0.6,
 			"task_chunk_size" : 10
 		}

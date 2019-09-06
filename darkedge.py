@@ -24,7 +24,6 @@ class DarkRendererEdge(ServerTCP):
 
         self.triangles    = []
         self.triangle_ids = []
-        self.rays         = []
         self.camera       = None
 
         self.task_queue = mp.Queue()
@@ -100,6 +99,7 @@ class DarkRendererEdge(ServerTCP):
         
     def start(self):
         while True:
+            message=''
             log.info("Waiting for client connection")
             self.listen()
             
@@ -140,7 +140,9 @@ class DarkRendererEdge(ServerTCP):
 
             log.info('Parsing scene data')
             ti = time()
-            self._parse_scene_data(message)
+            self._parse_scene_data(message.split())
+            message=''
+            
             log.warning(f'Parse time: {time() - ti} seconds')
 
             log.info('Computing intersection')
@@ -203,16 +205,23 @@ class DarkRendererEdge(ServerTCP):
     NUM_TRIANGLE_ATTRS = 9
     NUM_RAY_ATTRS = 6
 
-    def _parse_scene_data(self, scene_data):
-        data = scene_data.split()
-        task_data = data[2:]
+    def _parse_scene_data(self, data):
+        ti = time()
         self.num_tris = int(data[0])
         self.num_rays = int(data[1])
+        task_data = data[2:]
+        print(f'Split time: {time() - ti} seconds')
+        data = None
+        scene_data = None
+        del data
+        del scene_data
+
         tri_end = self.num_tris * (self.NUM_TRIANGLE_ATTRS+1)
         self.triangle_ids = list(map(int, task_data[: self.num_tris]))
         self.triangles    = list(map(float, task_data[self.num_tris : tri_end]))
         
         cam_data = task_data[tri_end : ]
+        rays = []
         if cam_data[0] == 'CAM':
             cam_data = cam_data[1:]
             res = (int(cam_data[0]), int(cam_data[1]))
@@ -222,12 +231,14 @@ class DarkRendererEdge(ServerTCP):
                 np.array(float_data[3:6]),
                 np.array(float_data[6:9]),
                 float_data[9], float_data[10])
-            self.rays = self.camera.get_rays(cpp_version=True)
+            rays = self.camera.get_rays(cpp_version=True)
         else:
-            self.rays = cam_data
+            rays = cam_data
 
+        ti = time()
         Task.next_id = 0
-        tasks = self.divide_tasks(self.rays)
+        tasks = self.divide_tasks(rays)
+        print(f'Tasks time: {time() - ti} seconds')
 
         task_pointer = 0
         number_of_tasks = len(tasks)

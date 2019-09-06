@@ -322,6 +322,7 @@ class TracerCloud(TracerPYNQ, ClientTCP):
                         print(f'{type(self).__name__}: Start stealing...')
                         start_stealing = True
                     break
+
             self.send_task(super_task)
             result = super_task.separate_results(self.receive_result())
             for r in result:

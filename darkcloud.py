@@ -9,8 +9,6 @@ from application.scheduling import Task, TaskResult
 from application.connection import ServerTCP
 import multiprocessing as mp
 from time import time, sleep
-from sortedcontainers import SortedDict
-from functools import reduce
 
 
 class DarkRendererCloud(ServerTCP):

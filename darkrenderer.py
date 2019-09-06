@@ -1,6 +1,7 @@
 import json
 import socket
 import struct
+import sys
 import logging as log
 from time import time
 from application.parser import Parser
@@ -92,7 +93,6 @@ def main():
 	mp.freeze_support()
 	mode = parser.args.mode
 	log.basicConfig(
-		#filename=mode + '.log',
 		stream=sys.stdout,
 		level=log.WARNING, 
 		format='%(levelname)s: [%(asctime)s] - %(message)s', 
