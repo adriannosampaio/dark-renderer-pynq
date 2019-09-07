@@ -6,19 +6,22 @@
 	},
 
 	"edge" : {
+		"_ip"   : "192.168.0.127",
+		"ip"   : "35.247.206.234",
 		"ip"   : "localhost",
-		"port" : 5002,
+
+		"port" : 5000,
 		"bitstream" : "/home/xilinx/adrianno/intersect_fpga_x2.bit"
 	},
 
 	"cloud" : {
 		"ip"   : "localhost",
-		"port" : 7501
+		"port" : 7500
 	},
 
 	"networking" : {
 		"recv_buffer_size" : 262144,
-		"compression" : true
+		"compression" : false
 	},
 
 	"testing" : {

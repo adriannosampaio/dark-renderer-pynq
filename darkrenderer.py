@@ -69,21 +69,17 @@ def run_client(config):
 	log.warning(f'Shading time: {time() - ti} seconds')
 
 def run_edge(config):
-	dark_node = DarkRendererEdge(config)
+	edge = DarkRendererEdge(config)
 	try:
-		for run in range(config['testing']['nruns']):
-			dark_node.start()
-			print()
+		edge.start()
 	finally:
-		dark_node.close()
+		edge.close()
 
 
 def run_cloud(config):
 	dark_cloud = DarkRendererCloud(config)
 	try:
-		for run in range(config['testing']['nruns']):
-			dark_cloud.start()
-			print()
+		dark_cloud.start()
 	finally:
 		dark_cloud.close()
 
@@ -115,11 +111,9 @@ def main():
 
 	log.info(f'Starting in {parser.args.mode} mode')
 	if mode == 'client':
-		for run in range(config['testing']['nruns']):
-			ti = time()
-			run_client(config)
-			log.warning(f'Client time: {time() - ti} seconds')
-			print()
+		ti = time()
+		run_client(config)
+		log.warning(f'Client time: {time() - ti} seconds')
 	elif mode == 'edge':
 		run_edge(config)
 	elif mode == 'cloud':
