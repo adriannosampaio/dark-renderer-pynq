@@ -89,15 +89,30 @@ def run_cloud(config):
 
 import sys
 
-def main():
-	mp.freeze_support()
-	mode = parser.args.mode
+def setup_logger(mode):
+	
 	log.basicConfig(
 		stream=sys.stdout,
 		level=log.WARNING, 
-		format='%(levelname)s: [%(asctime)s] - %(message)s', 
 		datefmt='%d-%b-%y %H:%M:%S')
 	
+	logFormatter = log.Formatter(
+		'%(levelname)s: [%(asctime)s] - %(message)s')
+	
+	rootLogger = log.getLogger()
+
+	fileHandler = log.FileHandler(mode + '.log')
+	fileHandler.setFormatter(logFormatter)
+	rootLogger.addHandler(fileHandler)
+
+	consoleHandler = log.StreamHandler()
+	consoleHandler.setFormatter(logFormatter)
+	rootLogger.addHandler(consoleHandler)
+
+def main():
+	mp.freeze_support()
+	mode = parser.args.mode
+	setup_logger(mode)
 
 	config_filename = None
 	if 'shutdown' in mode:
