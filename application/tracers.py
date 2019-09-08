@@ -91,8 +91,7 @@ class XIntersectFPGA():
     def set_scene(self, tri_ids, tris):
         from pynq import Xlnk
         self.num_tris = len(tri_ids)
-        log.info(f'{self.name}: Allocating shared input arrays')
-        
+
         self._tids = self.xlnk.cma_array(
             shape=(self.num_tris,), 
             dtype=np.int32)
@@ -102,15 +101,11 @@ class XIntersectFPGA():
             dtype=np.float64)
 
         ti = time()
-        log.info(f'{self.name}: Filling input memory arrays')
         for t in range(self.num_tris):
             self._tids[t] = tri_ids[t]
             for i in range(9):
                 self._tris[t*9+i] = tris[t*9+i]
-        log.info(f'{self.name}: Triangle arrays filled in {time() - ti} seconds')
 
-        log.info(f'{self.name}: Setting accelerator input triangle data addresses')
-        
         self.intersect_ip.write(
             self.ADDR_I_TNUMBER_DATA, 
             self.num_tris)
@@ -127,17 +122,13 @@ class XIntersectFPGA():
         return self.intersect_ip.read(0x00) == 4
 
     def compute(self, rays):
-        
         num_rays = len(rays) // 6
 
-        log.info(f'{self.name}: Allocating shared input array')
         self._rays = self.xlnk.cma_array(shape=(num_rays*6,), dtype=np.float64)
 
-        log.info(f'{self.name}: Allocating shared output arrays')
         self._out_ids   = self.xlnk.cma_array(shape=(num_rays,), dtype=np.int32)
         self._out_inter = self.xlnk.cma_array(shape=(num_rays,), dtype=np.float64)
 
-        log.info(f'{self.name}: Setting task data physical addresses')
         self.intersect_ip.write(self.ADDR_I_RNUMBER_DATA, num_rays)
         self.intersect_ip.write(self.ADDR_I_RDATA_DATA, self._rays.physical_address)
         
@@ -147,7 +138,6 @@ class XIntersectFPGA():
         ti = time()
         for i, r in enumerate(rays):
             self._rays[i] = r
-        log.info(f'{self.name}: Ray arrays filled in {time() - ti} seconds')
 
         log.info(f'Starting co-processor {self.name}')
         self.intersect_ip.write(0x00, 1)
@@ -180,7 +170,6 @@ class TracerCPU(TracerPYNQ):
             # CPP without parallelism
             ids, intersects = cpp_tracer.compute(
                 rays, self.tri_ids, self.tris)
-
         return (ids, intersects)
 
 
@@ -193,17 +182,22 @@ class TracerFPGA(TracerPYNQ):
 
         #overlay = Overlay('/home/xilinx/adrianno/intersect_fpga_x2.bit')
         overlay = Overlay(overlay_filename)
-        log.warning('Finished loading overlay')
+        log.critical('Finished loading overlay')
         
         log.info('Initializing FPGA instances')
-        self.accelerators.append(
-            XIntersectFPGA(overlay.intersectFPGA_0, 'accel_0'))
-
         if use_multi_fpga:
             log.info('Using multi-accelerator mode')
+            # detecting all accelerators in current overlay
+            accel_names = [x for x in dir(overlay) if 'intersectFPGA_' in x]
+            # getting the attribute from overlay
+            self.accelerators = [
+                getattr(overlay, attr) for attr in accel_names]
+        else:
             self.accelerators.append(
-                XIntersectFPGA(overlay.intersectFPGA_1, 'accel_1'))
+                XIntersectFPGA(overlay.intersectFPGA_0, 'accel_0'))
 
+        self.num_accelerators = len(self.accelerators)
+        log.info(f'Detected {self.num_accelerators} accelerators')
 
     def set_scene(self, tri_ids, tris):
         for accel in self.accelerators:
@@ -217,29 +211,14 @@ class TracerFPGA(TracerPYNQ):
 
     def get_results(self):
         ids, intersects = [], []
-        if self.use_multi_fpga:
-            ids0, intersects0 = self.accelerators[0].get_results()
-            ids1, intersects1 = self.accelerators[1].get_results()
-            intersects = intersects0 + intersects1
-            ids =  ids0 + ids1
-        else:
-            ids, intersects = self.accelerators[0].get_results()
+        
+        for accel in self.accelerators:
+            res = accel.get_results()
+            ids += res[0]
+            intersects += res[1]
+
         return (ids, intersects)
 
-    def start_compute(self, rays):
-        if self.use_multi_fpga:
-            num_rays = len(rays) // 6
-            self.accelerators[0].compute(
-                rays[ : 6*(num_rays//2)], 
-                self.tri_ids, 
-                self.tris)
-
-            self.accelerators[1].compute(
-                rays[6*(num_rays//2) : ], 
-                self.tri_ids, 
-                self.tris)
-        else:
-            self.accelerators[0].compute(rays, tri_ids, tris)
 
     def compute(self, rays):
         ''' Call the ray-triangle intersection FPGA accelerator
@@ -249,12 +228,14 @@ class TracerFPGA(TracerPYNQ):
             and to get the results manually
         '''
         if self.use_multi_fpga:
+            from .scheduling import divide_tasks
+            # dividing the rays into equal sized tasks
             num_rays = len(rays) // 6
-            self.accelerators[0].compute(
-                rays[ : 6*(num_rays//2)])
-
-            self.accelerators[1].compute(
-                rays[6*(num_rays//2) : ])
+            tasks = divide_tasks(rays, 
+                np.floor(num_rays/self.num_accelerators))
+            # one task for each accelerator
+            for accel, task in zip(self.accelerators, tasks):
+                accel.compute(task.ray_data)
         else:
             self.accelerators[0].compute(rays)
         
