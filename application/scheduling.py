@@ -72,3 +72,19 @@ class TracerSummary():
         ret = f'{self.tracer_type} processed '
         ret += f'{self.tasks_processed} tasks'
         return ret
+
+def divide_tasks(rays, max_task_size):
+    import numpy as np
+    num_rays = len(rays)//6
+    number_of_tasks = int(np.ceil(num_rays/max_task_size))
+    ray_tasks = []
+    for i in range(1, number_of_tasks+1):
+        task_start = (i - 1) * max_task_size * 6
+        task_data = []
+        if i < number_of_tasks:
+            task_end = task_start + (max_task_size*6)
+            task_data = rays[task_start : task_end]
+        else:
+            task_data = rays[task_start : ]
+        ray_tasks.append(Task(task_data))
+    return ray_tasks

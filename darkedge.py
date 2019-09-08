@@ -206,6 +206,7 @@ class DarkRendererEdge(ServerTCP):
     NUM_RAY_ATTRS = 6
 
     def _parse_scene_data(self, data):
+
         ti = time()
         self.num_tris = int(data[0])
         self.num_rays = int(data[1])
@@ -237,7 +238,8 @@ class DarkRendererEdge(ServerTCP):
 
         ti = time()
         Task.next_id = 0
-        tasks = self.divide_tasks(rays)
+        from application.scheduling import divide_tasks
+        tasks = divide_tasks(rays, self.config['processing']['task_size'])
         print(f'Tasks time: {time() - ti} seconds')
 
         task_pointer = 0
@@ -263,22 +265,3 @@ class DarkRendererEdge(ServerTCP):
         setup_report += f'Generated {len(tasks)} tasks | '
         setup_report += f'Using {len(self.task_queues)} queue(s)'
         log.info(setup_report)
-
-
-
-    def divide_tasks(self, rays):
-        num_rays = len(rays)//6
-        max_task_size = self.config['processing']['task_size']
-        log.info(f'Maximum task size: {max_task_size}')
-        number_of_tasks = int(np.ceil(num_rays/max_task_size))
-        ray_tasks = []
-        for i in range(1, number_of_tasks+1):
-            task_start = (i - 1) * max_task_size * 6
-            task_data = []
-            if i < number_of_tasks:
-                task_end = task_start + (max_task_size*6)
-                task_data = rays[task_start : task_end]
-            else:
-                task_data = rays[task_start : ]
-            ray_tasks.append(Task(task_data))
-        return ray_tasks
