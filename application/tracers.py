@@ -112,7 +112,7 @@ class TracerFPGA(TracerPYNQ):
             accel_names = [x for x in dir(overlay) if 'intersectFPGA_' in x]
             # getting the attribute from overlay
             self.accelerators = [
-                getattr(overlay, attr) for attr in accel_names]
+                XIntersectFPGA(getattr(overlay, attr), attr) for attr in accel_names]
         else:
             self.accelerators.append(
                 XIntersectFPGA(overlay.intersectFPGA_0, 'accel_0'))
@@ -153,7 +153,7 @@ class TracerFPGA(TracerPYNQ):
             # dividing the rays into equal sized tasks
             num_rays = len(rays) // 6
             tasks = divide_tasks(rays, 
-                np.floor(num_rays/self.num_accelerators))
+                int(np.ceil(num_rays/self.num_accelerators)))
             # one task for each accelerator
             for accel, task in zip(self.accelerators, tasks):
                 accel.compute(task.ray_data)
