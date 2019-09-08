@@ -94,9 +94,7 @@ class DarkRendererClient(ClientTCP):
             triangles_hit += res.triangles_hit
             intersections += res.intersections
 
-        #log.warning(f'Recv time: {tf - ti} seconds')
-        #result = self.recv_msg(compression)
-        #tf = time()
+        log.warning(f'Edge report:\n{self.recv_msg(compression)}')
 
         self.close()
         return json.dumps({
