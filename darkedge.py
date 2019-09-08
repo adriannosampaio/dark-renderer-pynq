@@ -136,19 +136,32 @@ class DarkRendererEdge(ServerTCP):
                         self.config['processing']['task_steal'] = value
 
                 message = self.recv_msg(compression)
-            log.warning(f'Recv time: {time() - ti} seconds')
+            
+            recv_report = f'Recv time: {time() - ti} seconds'
+            log.warning(recv_report)
 
             log.info('Parsing scene data')
             ti = time()
-            self._parse_scene_data(message.split())
+            setup_report = self._parse_scene_data(message.split())
             message=''
             
-            log.warning(f'Parse time: {time() - ti} seconds')
+            parse_report = f'Parse time: {time() - ti} seconds'
+            log.warning(parse_report)
 
             log.info('Computing intersection')
             ti = time()
-            self._compute()
-            log.warning(f'Intersection time: {time() - ti} seconds')
+            tasks_report = self._compute()
+            intersection_report = f'Intersection time: {time() - ti} seconds'
+            log.warning(intersection_report)
+
+            reports = '\n'.join([
+                recv_report,
+                parse_report,
+                intersection_report,
+                setup_report,
+                tasks_report])
+
+            self.send_msg(reports, compression)
 
     def send_result(self, result):
         message = f'{result.task_id} {len(result.triangles_hit)} '
@@ -195,11 +208,12 @@ class DarkRendererEdge(ServerTCP):
 
         for p in processes: p.join()
 
-        summ_message = f'Processing report: '
+        summ_message = f'Processing report: | '
         while not self.report_queue.empty():
             summ = self.report_queue.get()
             summ_message += f'{str(summ)} | '
         log.warning(summ_message)
+        return summ_message
 
 
     NUM_TRIANGLE_ATTRS = 9
@@ -261,7 +275,8 @@ class DarkRendererEdge(ServerTCP):
             for _ in self.tracers:
                 q.put(None)
 
-        setup_report = 'Setup report:'
+        setup_report = 'Setup report: | '
         setup_report += f'Generated {len(tasks)} tasks | '
-        setup_report += f'Using {len(self.task_queues)} queue(s)'
+        setup_report += f'Using {len(self.task_queues)} queue(s) |'
         log.info(setup_report)
+        return setup_report
