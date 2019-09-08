@@ -11,7 +11,7 @@ import multiprocessing as mp
 
 parser = Parser()
 
-def run_client(config):
+def run_client(config, task_size):
 	import numpy as np
 	from PIL import Image
 	from application.raytracer.scene import Scene
@@ -35,7 +35,7 @@ def run_client(config):
 	log.warning(f'Setup time: {time() - ti} seconds')
 
 	ti = time()
-	res = json.loads(client.compute_scene(scene))
+	res = json.loads(client.compute_scene(scene, task_size))
 	log.warning(f'Intersection time: {time() - ti} seconds')
 	
 	ti = time()
@@ -107,13 +107,10 @@ def main():
 	if mode == 'client':
 		for run in range(config['testing']['nruns']):
 			ti = time()
-			run_client(config)
+			run_client(config, parser.args.task_size)
 			log.warning(f'Client time: {time() - ti} seconds')
 			print()
 	elif mode == 'edge':
-		task_size = parser.args.task_size
-		if task_size is not None:
-			config['processing']['task_size'] = task_size 
 		run_edge(config)
 	elif mode == 'cloud':
 		run_cloud(config)

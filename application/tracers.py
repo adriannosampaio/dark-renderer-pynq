@@ -1,7 +1,7 @@
 import numpy as np 
 import logging as log
 from time import time, sleep
-from .scheduling import TaskResult
+from .scheduling import TaskResult, TracerSummary
 from .connection import ClientTCP
 
 class TracerPYNQ:
@@ -14,17 +14,19 @@ class TracerPYNQ:
     def compute(self, rays):
         raise Exception('ERROR: Using abstract class')
 
-    def start(self, task_queue, result_queue):
+    def start(self, task_queue, result_queue, report_queue=None):
         task = task_queue.get()
+        report = TracerSummary(self)
         while task is not None:
-            log.info(f'Processing task {task.id}')
+            print(f'{type(self).__name__}: Processing task {task.id}')
+            
+            report.increment()
+
             out_ids, out_inter = self.compute(task.ray_data)
-            result = TaskResult(
-                task.id,
-                out_ids,
-                out_inter)
+            result = TaskResult(task.id, out_ids, out_inter)
             result_queue.put(result, task_queue.qsize())
             task = task_queue.get()
+        if report_queue is not None: report_queue.put(report)
         result_queue.put(None)
 
 
@@ -232,6 +234,7 @@ class TracerCloud(TracerPYNQ, ClientTCP):
         self.cloud_addr = cloud_addr
         self.config = config
         self.compression = config['networking']['compression']
+
         
 
     def shutdown(self):
@@ -247,25 +250,43 @@ class TracerCloud(TracerPYNQ, ClientTCP):
         scene += f"{' '.join(map(str, triangles))}"
         self.send_msg(scene, self.compression)
 
-    def compute(self, task):
-        task_msg = f'{task.id} '
+    def send_task(self, task):
+        task_msg = f'{task.id}\n'
         task_msg += f"{' '.join(map(str, task.ray_data))}"
         self.send_msg(task_msg, self.compression)
 
+    def receive_result(self):
         res = self.recv_msg(self.compression).split()
         task_id = int(res[0])
         num_rays = int(res[1])
         out_ids = list(map(int, res[2:num_rays+2]))
         out_inter = list(map(float, res[num_rays+2:]))
-        return TaskResult(task.id, out_ids, out_inter)
+        return TaskResult(task_id, out_ids, out_inter)
 
-    def start(self, task_queue, result_queue):
-        task = task_queue.get()
-        while task is not None:
-            log.info(f'Processing task {task.id}')
-            result = self.compute(task)
-            result_queue.put(result)
-            task = task_queue.get()
+    def start(self, task_queue, result_queue, report_queue=None):
+        report = TracerSummary(self)
+        chunk_size = self.config['processing']['cloud']['task_chunk_size']
+        finished = False
+        while not finished:
+            task_counter = 0
+            for i in range(chunk_size):
+                task = task_queue.get()
+                if task is not None:
+                    print(f'{type(self).__name__}: Processing task {task.id}')
+                    report.increment()
+                    self.send_task(task)
+                    task_counter += 1
+                else:
+                    finished = True
+                    break
+
+            print(f'waiting for {task_counter} tasks')
+            for i in range(task_counter):
+                result = self.receive_result()
+                print(f'Received task {result.task_id} results')
+                print(result.triangles_hit[:20])
+                result_queue.put(result)
         self.send_msg('END', self.compression)
+        if report_queue is not None: report_queue.put(report)
         result_queue.put(None)
 

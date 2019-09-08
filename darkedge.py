@@ -5,12 +5,10 @@ import struct
 import application.tracers as tracer
 from application.parser import Parser
 from application.raytracer.scene import Camera
-from application.scheduling import Task, TaskResult
+from application.scheduling import Task
 from application.connection import ServerTCP
 import multiprocessing as mp
 from time import time
-from sortedcontainers import SortedDict
-from functools import reduce
 
 def save_intersections(filename, ids, intersects):
     with open(filename, 'w') as file:
@@ -31,6 +29,7 @@ class DarkRendererEdge(ServerTCP):
 
         self.task_queue = mp.Queue()
         self.result_queue = mp.Queue()
+        self.report_queue = mp.Queue()
 
         processing = config['processing']
         self.cpu_active = processing['cpu']['active']
@@ -81,6 +80,14 @@ class DarkRendererEdge(ServerTCP):
                         if type(tr) == tracer.TracerCloud:
                             tr.shutdown()
                 break
+
+            elif 'CONFIG' in message:
+                config_msg = message.split()[1:]
+                params = {}
+                for i, param in enumerate(config_msg):
+                    if param == 'TSIZE':
+                        self.config['processing']['task_size'] = int(config_msg[i + 1])
+                message = self.recv_msg(compression)
             log.warning(f'Recv time: {time() - ti} seconds')
 
             log.info('Parsing scene data')
@@ -104,7 +111,7 @@ class DarkRendererEdge(ServerTCP):
         log.info('Starting edge computation')
 
         processes = []
-        for tracer in self.tracers:
+        for counter, tracer in enumerate(self.tracers):
             tracer.set_scene(
                 self.triangle_ids,
                 self.triangles)
@@ -112,16 +119,16 @@ class DarkRendererEdge(ServerTCP):
             processes.append(
                 mp.Process(
                     target=tracer.start, 
-                    args=(self.task_queue, self.result_queue)
+                    args=(self.task_queue, 
+                        self.result_queue,
+                        self.report_queue)
                 )
             )
 
-        for p in processes:
-            p.start()
+        for p in processes: p.start()
 
         tracers_finished = 0
-        ids_dict = SortedDict()
-        intersect_dict = SortedDict() 
+        results = []
 
         log.info(f'Number of tracers = {len(self.tracers)}')
         while tracers_finished < len(self.tracers):
@@ -129,24 +136,25 @@ class DarkRendererEdge(ServerTCP):
             if res is None:
                 tracers_finished += 1
             else:
-                task_id = res.task_id 
-                ids_dict[task_id] = res.triangles_hit
-                intersect_dict[task_id] = res.intersections
+                results.append(res)
 
-        for p in processes:
-            p.join()
+        for p in processes: p.join()
 
-        ids = reduce(
-            lambda x, y : x + y,
-            ids_dict.values())
+        triangles_hit = []
+        intersections = []
+        for res in sorted(results, key=lambda x : x.task_id):
+            triangles_hit += res.triangles_hit
+            intersections += res.intersections
 
-        intersects = reduce(
-            lambda x, y : x + y,
-            intersect_dict.values())
+        summ_message = f'Processing summary:\n'
+        while not self.report_queue.empty():
+            summ = self.report_queue.get()
+            summ_message += f'\t- {str(summ)}\n'
+        log.warning(summ_message)
 
         return {
-            'intersections' : intersects,
-            'triangles_hit' : ids
+            'intersections' : intersections,
+            'triangles_hit' : triangles_hit,
         } 
 
     NUM_TRIANGLE_ATTRS = 9
@@ -173,6 +181,7 @@ class DarkRendererEdge(ServerTCP):
 
         Task.next_id = 0
         tasks = self.divide_tasks(self.rays)
+        log.info(f'Generated {len(tasks)} tasks')
         for t in tasks:
             self.task_queue.put(t)
         for _ in self.tracers:
@@ -183,6 +192,7 @@ class DarkRendererEdge(ServerTCP):
     def divide_tasks(self, rays):
         num_rays = len(rays)//6
         max_task_size = self.config['processing']['task_size']
+        log.info(f'Maximum task size: {max_task_size}')
         number_of_tasks = int(np.ceil(num_rays/max_task_size))
         ray_tasks = []
         for i in range(1, number_of_tasks+1):

@@ -16,9 +16,7 @@ class TemplateTCP(object):
 			compressed_msg = zlib.compress(msg)
 			msg = compressed_msg
 		self.socket.send(
-			struct.pack(
-				'>I', len(msg)) + msg
-			)
+			struct.pack('>I', len(msg)) + msg)
 
 	def recv_msg(self, decompress=True):
 		size_msg = self.socket.recv(4)

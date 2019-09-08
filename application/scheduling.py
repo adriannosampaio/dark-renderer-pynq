@@ -26,3 +26,17 @@ class TaskResult():
         self.triangles_hit = triangles_hit
         self.intersections = intersections
         self.ray_number = len(triangles_hit)
+
+
+class TracerSummary():
+    def __init__(self, tracer):
+        self.tasks_processed = 0
+        self.tracer_type = type(tracer).__name__
+
+    def increment(self):
+        self.tasks_processed += 1
+
+    def __str__(self):
+        ret = f'{self.tracer_type} processed '
+        ret += f'{self.tasks_processed} tasks'
+        return ret

@@ -35,39 +35,41 @@ class DarkRendererCloud(ServerTCP):
         self.tracers.append(
             tracer.TracerCPU(use_multicore))
     
-    def task_receiver(self):
+    def task_receiver(self, task_queue):
         # Receive a task in the shape
         # <id> <ray 1> ... <ray n> where 
         # <ray i> = ox oy oz dx dy dz for every i
         
         msg = self.recv_msg(self.compression)
         while msg != 'END':
-            log.info(msg)
             msg = msg.split()
             task_id = int(msg[0])
+            print(f'Stored task {task_id}')
             ray_data = list(map(float, msg[1:]))
-            self.task_queue.put(Task(ray_data, task_id))
+            task_queue.put(Task(ray_data, task_id))
             msg = self.recv_msg(self.compression)
-            sleep(0.2)
 
         # Adding close orders
         for _ in self.tracers:
-            self.task_queue.put(None)
+            task_queue.put(None)
 
-    def task_returner(self):
+    def task_returner(self, result_queue):
         # return task results in the shape:
         # <id> <nrays> <ids> <intersects>
         tracers_finished = 0
         log.info(f'num tracers = {len(self.tracers)}')
         while tracers_finished < len(self.tracers):
-            res = self.result_queue.get()
+            # print(tracers_finished)
+            res = result_queue.get()
             if res is None:
                 tracers_finished += 1
             else:
+                print(f'Returning task {res.task_id}')
                 task_result = f'{res.task_id} {len(res.triangles_hit)} ' 
                 task_result += f"{' '.join(map(str, res.triangles_hit))}\n"
                 task_result += f"{' '.join(map(str, res.intersections))}"
                 self.send_msg(task_result, self.compression)
+            
 
 
     def start(self):
@@ -84,7 +86,6 @@ class DarkRendererCloud(ServerTCP):
                 map(int, scene_data[1 : self.num_tris + 1]))
             self.triangles = list(
                 map(float, scene_data[self.num_tris + 1 : ]))
-
             log.warning(f'Recv scene time: {time() - ti} seconds')
 
             log.info('Start receiving tasks')
@@ -98,7 +99,9 @@ class DarkRendererCloud(ServerTCP):
         log.info('Starting cloud computation')
 
         processes = [
-            mp.Process(target=self.task_receiver)]
+            mp.Process(
+                target=self.task_receiver,
+                args=(self.task_queue,))]
 
         for tracer in self.tracers:
             tracer.set_scene(
@@ -114,7 +117,7 @@ class DarkRendererCloud(ServerTCP):
 
         for p in processes: p.start()
 
-        self.task_returner()
+        self.task_returner(self.result_queue)
 
         for p in processes: p.join()
 
