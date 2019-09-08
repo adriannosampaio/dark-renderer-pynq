@@ -27,6 +27,26 @@ class Parser:
             help='Maximum size of an edge task')
 
         self.parser.add_argument(
+            '--task-chunk-size',
+            type=int,
+            help='Number of simultaneous tasks to be processed on the cloud')
+
+        self.parser.add_argument(
+            '--multiqueue',
+            action='store_true',
+            help='Use multiple queues on the edge')        
+
+        self.parser.add_argument(
+            '--task-stealing',
+            action='store_true',
+            help='Allow task stealing on the edge')
+
+        self.parser.add_argument(
+            '--send-cam',
+            action='store_true',
+            help='Send camera to the edge instead of the rays')
+
+        self.parser.add_argument(
             '--config',
             type=str,
             help='Name of a configuration json file. [default.json if empty]')

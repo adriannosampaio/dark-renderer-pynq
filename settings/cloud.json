@@ -2,7 +2,7 @@
 
 	"cloud" : {
 		"ip"   : "localhost",
-		"port" : 7502,
+		"port" : 6000,
 		"processing" : {
 			"_comment" : "3 modes: fpga, cpu and heterogeneous",
 			"mode" : "cpu",

@@ -1,6 +1,7 @@
 import json
 import socket
 import struct
+import sys
 import logging as log
 from time import time
 from application.parser import Parser
@@ -11,7 +12,7 @@ import multiprocessing as mp
 
 parser = Parser()
 
-def run_client(config, task_size):
+def run_client(config):
 	import numpy as np
 	from PIL import Image
 	from application.raytracer.scene import Scene
@@ -35,7 +36,16 @@ def run_client(config, task_size):
 	log.warning(f'Setup time: {time() - ti} seconds')
 
 	ti = time()
-	res = json.loads(client.compute_scene(scene, task_size))
+	res = json.loads(
+		client.compute_scene(
+			scene, 
+			parser.args.task_size,
+			parser.args.task_chunk_size,
+			parser.args.multiqueue,
+			parser.args.send_cam,
+			parser.args.task_stealing,
+		)
+	)
 	log.warning(f'Intersection time: {time() - ti} seconds')
 	
 	ti = time()
@@ -59,32 +69,28 @@ def run_client(config, task_size):
 	log.warning(f'Shading time: {time() - ti} seconds')
 
 def run_edge(config):
-	dark_node = DarkRendererEdge(config)
+	edge = DarkRendererEdge(config)
 	try:
-		for run in range(config['testing']['nruns']):
-			dark_node.start()
-			print()
+		edge.start()
 	finally:
-		dark_node.close()
+		edge.close()
 
 
 def run_cloud(config):
 	dark_cloud = DarkRendererCloud(config)
 	try:
-		for run in range(config['testing']['nruns']):
-			dark_cloud.start()
-			print()
+		dark_cloud.start()
 	finally:
 		dark_cloud.close()
 
-
+import sys
 
 def main():
 	mp.freeze_support()
 	mode = parser.args.mode
 	log.basicConfig(
-		# filename=mode + '.log',
-		level=log.DEBUG, 
+		stream=sys.stdout,
+		level=log.WARNING, 
 		format='%(levelname)s: [%(asctime)s] - %(message)s', 
 		datefmt='%d-%b-%y %H:%M:%S')
 	
@@ -105,11 +111,9 @@ def main():
 
 	log.info(f'Starting in {parser.args.mode} mode')
 	if mode == 'client':
-		for run in range(config['testing']['nruns']):
-			ti = time()
-			run_client(config, parser.args.task_size)
-			log.warning(f'Client time: {time() - ti} seconds')
-			print()
+		ti = time()
+		run_client(config)
+		log.warning(f'Client time: {time() - ti} seconds')
 	elif mode == 'edge':
 		run_edge(config)
 	elif mode == 'cloud':

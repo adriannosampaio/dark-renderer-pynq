@@ -9,8 +9,6 @@ from application.scheduling import Task, TaskResult
 from application.connection import ServerTCP
 import multiprocessing as mp
 from time import time, sleep
-from sortedcontainers import SortedDict
-from functools import reduce
 
 
 class DarkRendererCloud(ServerTCP):
@@ -32,8 +30,7 @@ class DarkRendererCloud(ServerTCP):
         self.tracers = []
         cpu_mode = processing['cpu']['mode']
         use_multicore = (cpu_mode == 'multicore')
-        self.tracers.append(
-            tracer.TracerCPU(use_multicore))
+        self.tracers.append(tracer.TracerCPU(0, use_multicore))
     
     def task_receiver(self, task_queue):
         # Receive a task in the shape
@@ -59,7 +56,6 @@ class DarkRendererCloud(ServerTCP):
         tracers_finished = 0
         log.info(f'num tracers = {len(self.tracers)}')
         while tracers_finished < len(self.tracers):
-            # print(tracers_finished)
             res = result_queue.get()
             if res is None:
                 tracers_finished += 1
@@ -111,7 +107,11 @@ class DarkRendererCloud(ServerTCP):
             processes.append(
                 mp.Process(
                     target=tracer.start, 
-                    args=(self.task_queue, self.result_queue)
+                    args=(
+                        self.result_queue,
+                        [self.task_queue],
+                        0,
+                        False)
                 )
             )
 
