@@ -24,11 +24,10 @@ class TracerPYNQ:
         for i, q in enumerate(task_queues):
             if self.active_queues[i]: 
                 task = task_queues[i].get()
-            
             if task is None: 
                 self.active_queues[i] = False
             else:
-                print(f'{type(self).__name__}: Stealing task {task.id} from queue {i}')
+                #print(f'{type(self).__name__}: Stealing task {task.id} from queue {i}')
                 break
         return task 
 
@@ -41,9 +40,8 @@ class TracerPYNQ:
             if task is None:
                 self.active_queues[main_queue] = False
             else:
-                print(f'{type(self).__name__}: Processing task {task.id}')
                 pass
-
+                #print(f'{type(self).__name__}: Processing task {task.id}')
         # if stealing is not active, return anyway
         if allow_stealing and task is None:
             # if stealing is active and the task obtained is None
@@ -207,6 +205,8 @@ class TracerCloud(TracerPYNQ, ClientTCP):
         chunk_size = self.config['processing']['cloud']['task_chunk_size']
         self.active_queues= [True for _ in task_queues]
         finished, start_stealing = False, False
+        super_tasks = []
+        super_task_id = 0
         while not finished:
             task_counter = 0
             print(*map(lambda x : x.qsize(), task_queues))
@@ -221,14 +221,19 @@ class TracerCloud(TracerPYNQ, ClientTCP):
                     if not allow_stealing or not np.any(self.active_queues):
                         finished = True
                     else:
-                        print(f'{type(self).__name__}: Start stealing...')
                         start_stealing = True
                     break
-
+            super_task.id = super_task_id
+            super_task_id += 1
             self.send_task(super_task)
-            result = super_task.separate_results(self.receive_result())
-            for r in result:
+            super_task.ray_data = None
+            super_tasks.append(super_task)
+
+        for st in super_tasks:
+            results = st.separate_results(self.receive_result())
+            for r in results:
                 result_queue.put(r)
+
         self.send_msg('END', self.compression)
         if report_queue is not None: report_queue.put(report)
         result_queue.put(None)

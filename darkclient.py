@@ -73,8 +73,6 @@ class DarkRendererClient(ClientTCP):
         tf = time()
         log.warning(f'Send time: {tf - ti} seconds')
 
-
-        #log.info('Waiting for results')
         ti = time()
         import numpy as np
         results = []
