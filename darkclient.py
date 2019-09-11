@@ -8,6 +8,10 @@ from time import time
 from application.connection import ClientTCP
 from application.scheduling import TaskResult
 
+def print_load_bar(percentage, size):
+    load_bar = ''.join(['#' if x/size <= percentage else '.' for x in range(size)])
+    sys.stdout.write(f"\rpercentage: {load_bar} | {int(100*percentage)}%")
+
 class DarkRendererClient(ClientTCP):
     ''' Class responsible for the DarkRenderer client behavior.
         This includes the TCP requests to the Fog/Cloud, task 
@@ -76,15 +80,17 @@ class DarkRendererClient(ClientTCP):
         ti = time()
         import numpy as np
         results = []
-        task_number = np.ceil(float(num_rays/task_size))
-        for i in range(int(task_number)):
+        task_number = int(np.ceil(float(num_rays/task_size)))
+
+        for i in range(task_number):
+            #print_load_bar(i/task_number, 30)
             res_msg = self.recv_msg(compression).split()
             task_id = int(res_msg[0])
-            log.debug(f'Receiving result {task_id}')
             task_sz = int(res_msg[1])
             out_ids = list(map(int, res_msg[2:2+task_sz]))
             out_its = list(map(float, res_msg[2+task_sz:]))
             results.append(TaskResult(task_id, out_ids, out_its))
+        print()
 
         triangles_hit = []
         intersections = []
