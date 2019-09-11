@@ -1,5 +1,6 @@
 import numpy as np
-
+from time import time
+import logging as log
 
 class XIntersectFPGA():
     
@@ -34,7 +35,7 @@ class XIntersectFPGA():
         
         self._tris = self.xlnk.cma_array(
             shape=(self.num_tris*9,), 
-            dtype=np.float64)
+            dtype=np.float32)
 
         ti = time()
         for t in range(self.num_tris):
@@ -60,10 +61,10 @@ class XIntersectFPGA():
     def compute(self, rays):
         num_rays = len(rays) // 6
 
-        self._rays = self.xlnk.cma_array(shape=(num_rays*6,), dtype=np.float64)
+        self._rays = self.xlnk.cma_array(shape=(num_rays*6,), dtype=np.float32)
 
         self._out_ids   = self.xlnk.cma_array(shape=(num_rays,), dtype=np.int32)
-        self._out_inter = self.xlnk.cma_array(shape=(num_rays,), dtype=np.float64)
+        self._out_inter = self.xlnk.cma_array(shape=(num_rays,), dtype=np.float32)
 
         self.intersect_ip.write(self.ADDR_I_RNUMBER_DATA, num_rays)
         self.intersect_ip.write(self.ADDR_I_RDATA_DATA, self._rays.physical_address)
