@@ -105,6 +105,7 @@ class DarkRendererEdge(ServerTCP):
             
             compression = self.config['networking']['compression']
             self.compression = self.config['networking']['compression']
+            self.config['processing']['cloud']['cloud_streaming'] = False
             log.info("Receiving scene file")
             ti = time()
             message = self.recv_msg(compression)
@@ -134,9 +135,11 @@ class DarkRendererEdge(ServerTCP):
                         value = bool(int(config_msg[i + 1]))
                         print(value)
                         self.config['processing']['task_steal'] = value
+                    elif param == 'STREAM':
+                        self.config['processing']['cloud']['cloud_streaming'] = True
 
                 message = self.recv_msg(compression)
-            
+            print('str', self.config['processing']['cloud']['cloud_streaming'])
             recv_report = f'Recv time: {time() - ti} seconds'
             log.warning(recv_report)
 
@@ -190,7 +193,8 @@ class DarkRendererEdge(ServerTCP):
                         self.task_queues,
                         tracer_id if self.multiqueue else 0,
                         allow_stealing, 
-                        self.report_queue)
+                        self.report_queue,
+                        self.config['processing']['cloud']['cloud_streaming'])
                 )
             )
 

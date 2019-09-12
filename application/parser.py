@@ -37,6 +37,11 @@ class Parser:
             help='Use multiple queues on the edge')        
 
         self.parser.add_argument(
+            '--cloud-streaming',
+            action='store_true',
+            help='Use cloud streaming the edge')   
+
+        self.parser.add_argument(
             '--task-stealing',
             action='store_true',
             help='Allow task stealing on the edge')
