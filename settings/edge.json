@@ -30,7 +30,7 @@
 		"cpu" : {
 			"_comment" : "cpu has 3 modes: python, singlecore and multicore",
 			"active" : true,
-			"mode" : "multicore",
+			"mode" : "singlecore",
 			"factor" : 0.4
 		},
 		"fpga" : {

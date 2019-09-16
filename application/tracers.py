@@ -21,15 +21,17 @@ class TracerPYNQ:
 
     def steal_task(self, task_queues):
         task = None
-        for i, q in enumerate(task_queues):
-            if self.active_queues[i]: 
-                task = task_queues[i].get()
-            
-            if task is None: 
-                self.active_queues[i] = False
-            else:
-                print(f'{type(self).__name__}: Stealing task {task.id} from queue {i}')
-                break
+        ordered_queues = sorted(
+            [(i, q) for i, q in enumerate(task_queues)], 
+            key=lambda x : x[1].qsize())
+        
+        for idx, queue in ordered_queues:
+            if self.active_queues[idx]:
+                task = queue.get()
+                if task is None:
+                    self.active_queues[idx] = False
+                else:
+                    break
         return task 
 
 
@@ -206,7 +208,7 @@ class TracerCloud(TracerPYNQ, ClientTCP):
         report = TracerSummary(self)
         chunk_size = self.config['processing']['cloud']['task_chunk_size']
         self.active_queues= [True for _ in task_queues]
-        finished, start_stealing = False, False
+        finished, start_stealing = False, True
         while not finished:
             task_counter = 0
             print(*map(lambda x : x.qsize(), task_queues))
@@ -227,10 +229,10 @@ class TracerCloud(TracerPYNQ, ClientTCP):
                 else:
                     if not allow_stealing or not np.any(self.active_queues):
                         finished = True
+                        break
                     else:
                         # print(f'{type(self).__name__}: Start stealing...')
                         start_stealing = True
-                    break
             if not cloud_streaming:
                 self.send_task(super_task)
                 result = super_task.separate_results(self.receive_result())
