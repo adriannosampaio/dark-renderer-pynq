@@ -8,6 +8,10 @@ from time import time
 from application.connection import ClientTCP
 from application.scheduling import TaskResult
 
+def print_load_bar(percentage, size):
+    load_bar = ''.join(['#' if x/size <= percentage else '.' for x in range(size)])
+    sys.stdout.write(f"\rpercentage: {load_bar} | {int(100*percentage)}%")
+
 class DarkRendererClient(ClientTCP):
     ''' Class responsible for the DarkRenderer client behavior.
         This includes the TCP requests to the Fog/Cloud, task 
@@ -34,7 +38,7 @@ class DarkRendererClient(ClientTCP):
     def compute_scene(self, scene, 
         task_size, task_chunk_size, 
         multiqueue, send_cam,
-        task_stealing):
+        task_stealing, cloud_streaming):
         # connect to the edge node
         compression = self.config['networking']['compression']
         self.connect(self.edge_addr)
@@ -48,6 +52,8 @@ class DarkRendererClient(ClientTCP):
             config_msg += f'MULTIQUEUE {int(multiqueue)} '
         if task_stealing is not None:
             config_msg += f'STEAL {int(task_stealing)} '
+        if cloud_streaming is not None:
+            config_msg += f'STREAM ' if cloud_streaming else ''
         print(config_msg)
         self.send_msg(config_msg, compression)
 
@@ -73,20 +79,20 @@ class DarkRendererClient(ClientTCP):
         tf = time()
         log.warning(f'Send time: {tf - ti} seconds')
 
-
-        #log.info('Waiting for results')
         ti = time()
         import numpy as np
         results = []
-        task_number = np.ceil(float(num_rays/task_size))
-        for i in range(int(task_number)):
+        task_number = int(np.ceil(float(num_rays/task_size)))
+
+        for i in range(task_number):
+            #print_load_bar(i/task_number, 30)
             res_msg = self.recv_msg(compression).split()
             task_id = int(res_msg[0])
-            log.debug(f'Receiving result {task_id}')
             task_sz = int(res_msg[1])
             out_ids = list(map(int, res_msg[2:2+task_sz]))
             out_its = list(map(float, res_msg[2+task_sz:]))
             results.append(TaskResult(task_id, out_ids, out_its))
+        print()
 
         triangles_hit = []
         intersections = []

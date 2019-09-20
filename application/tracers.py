@@ -24,11 +24,10 @@ class TracerPYNQ:
         for i, q in enumerate(task_queues):
             if self.active_queues[i]: 
                 task = task_queues[i].get()
-            
             if task is None: 
                 self.active_queues[i] = False
             else:
-                print(f'{type(self).__name__}: Stealing task {task.id} from queue {i}')
+                #print(f'{type(self).__name__}: Stealing task {task.id} from queue {i}')
                 break
         return task 
 
@@ -41,9 +40,8 @@ class TracerPYNQ:
             if task is None:
                 self.active_queues[main_queue] = False
             else:
-                print(f'{type(self).__name__}: Processing task {task.id}')
                 pass
-
+                #print(f'{type(self).__name__}: Processing task {task.id}')
         # if stealing is not active, return anyway
         if allow_stealing and task is None:
             # if stealing is active and the task obtained is None
@@ -52,7 +50,7 @@ class TracerPYNQ:
         
         return task
 
-    def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None):
+    def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None, *args):
         self.active_queues= [True for _ in task_queues]
         task = self.get_task(task_queues, main_queue_id, allow_stealing)
         report = TracerSummary(self)
@@ -202,33 +200,47 @@ class TracerCloud(TracerPYNQ, ClientTCP):
         out_inter = res[num_rays+2:]
         return TaskResult(task_id, out_ids, out_inter)
 
-    def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None):
+    def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None, cloud_streaming=False):
         report = TracerSummary(self)
         chunk_size = self.config['processing']['cloud']['task_chunk_size']
         self.active_queues= [True for _ in task_queues]
         finished, start_stealing = False, False
+        super_tasks = []
+        super_task_id = 0
         while not finished:
             task_counter = 0
             print(*map(lambda x : x.qsize(), task_queues))
-            super_task = SuperTask()
+            
+            if not cloud_streaming:
+                super_task = SuperTask()
+
             for i in range(chunk_size):
                 task = self.get_task(task_queues, main_queue_id, start_stealing)
                 if task is not None:
                     report.increment()
-                    super_task.add_task(task)
+                    if not cloud_streaming:
+                        super_task.add_task(task)
+                    else:
+                        # print(f'{type(self).__name__}: sending task {task.id}')
+                        self.send_task(task)
                     task_counter += 1
                 else:
                     if not allow_stealing or not np.any(self.active_queues):
                         finished = True
                     else:
-                        print(f'{type(self).__name__}: Start stealing...')
+                        # print(f'{type(self).__name__}: Start stealing...')
                         start_stealing = True
                     break
-
-            self.send_task(super_task)
-            result = super_task.separate_results(self.receive_result())
-            for r in result:
-                result_queue.put(r)
+            if not cloud_streaming:
+                self.send_task(super_task)
+                result = super_task.separate_results(self.receive_result())
+                for r in result:
+                    result_queue.put(r)
+            else:
+                for i in range(task_counter):
+                    res = self.receive_result()
+                    # print(f'{type(self).__name__}: received result {res.task_id}')
+                    result_queue.put(res)
         self.send_msg('END', self.compression)
         if report_queue is not None: report_queue.put(report)
         result_queue.put(None)
