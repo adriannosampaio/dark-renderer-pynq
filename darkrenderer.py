@@ -44,6 +44,7 @@ def run_client(config):
 			parser.args.multiqueue,
 			parser.args.send_cam,
 			parser.args.task_stealing,
+			parser.args.cloud_streaming,
 		)
 	)
 	log.warning(f'Intersection time: {time() - ti} seconds')

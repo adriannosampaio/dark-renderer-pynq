@@ -38,7 +38,7 @@ class DarkRendererClient(ClientTCP):
     def compute_scene(self, scene, 
         task_size, task_chunk_size, 
         multiqueue, send_cam,
-        task_stealing):
+        task_stealing, cloud_streaming):
         # connect to the edge node
         compression = self.config['networking']['compression']
         self.connect(self.edge_addr)
@@ -52,6 +52,8 @@ class DarkRendererClient(ClientTCP):
             config_msg += f'MULTIQUEUE {int(multiqueue)} '
         if task_stealing is not None:
             config_msg += f'STEAL {int(task_stealing)} '
+        if cloud_streaming is not None:
+            config_msg += f'STREAM ' if cloud_streaming else ''
         print(config_msg)
         self.send_msg(config_msg, compression)
 

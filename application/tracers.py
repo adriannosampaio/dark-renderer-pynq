@@ -50,7 +50,7 @@ class TracerPYNQ:
         
         return task
 
-    def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None):
+    def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None, *args):
         self.active_queues= [True for _ in task_queues]
         task = self.get_task(task_queues, main_queue_id, allow_stealing)
         report = TracerSummary(self)
@@ -200,7 +200,7 @@ class TracerCloud(TracerPYNQ, ClientTCP):
         out_inter = res[num_rays+2:]
         return TaskResult(task_id, out_ids, out_inter)
 
-    def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None):
+    def start(self, result_queue, task_queues, main_queue_id, allow_stealing=False, report_queue=None, cloud_streaming=False):
         report = TracerSummary(self)
         chunk_size = self.config['processing']['cloud']['task_chunk_size']
         self.active_queues= [True for _ in task_queues]
@@ -210,30 +210,37 @@ class TracerCloud(TracerPYNQ, ClientTCP):
         while not finished:
             task_counter = 0
             print(*map(lambda x : x.qsize(), task_queues))
-            super_task = SuperTask()
+            
+            if not cloud_streaming:
+                super_task = SuperTask()
+
             for i in range(chunk_size):
                 task = self.get_task(task_queues, main_queue_id, start_stealing)
                 if task is not None:
                     report.increment()
-                    super_task.add_task(task)
+                    if not cloud_streaming:
+                        super_task.add_task(task)
+                    else:
+                        # print(f'{type(self).__name__}: sending task {task.id}')
+                        self.send_task(task)
                     task_counter += 1
                 else:
                     if not allow_stealing or not np.any(self.active_queues):
                         finished = True
                     else:
+                        # print(f'{type(self).__name__}: Start stealing...')
                         start_stealing = True
                     break
-            super_task.id = super_task_id
-            super_task_id += 1
-            self.send_task(super_task)
-            super_task.ray_data = None
-            super_tasks.append(super_task)
-
-        for st in super_tasks:
-            results = st.separate_results(self.receive_result())
-            for r in results:
-                result_queue.put(r)
-
+            if not cloud_streaming:
+                self.send_task(super_task)
+                result = super_task.separate_results(self.receive_result())
+                for r in result:
+                    result_queue.put(r)
+            else:
+                for i in range(task_counter):
+                    res = self.receive_result()
+                    # print(f'{type(self).__name__}: received result {res.task_id}')
+                    result_queue.put(res)
         self.send_msg('END', self.compression)
         if report_queue is not None: report_queue.put(report)
         result_queue.put(None)
