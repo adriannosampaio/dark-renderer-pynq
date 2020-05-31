@@ -1,4 +1,4 @@
-CC=g++ -std=c++11
+CC=g++ -std=c++11 -O3
 FLAGS=-shared -fPIC -fopenmp
 INCLUDES=-I./deps/pybind11/include -I/usr/include/python3.6
 FILES=tracer.cpp binding.cpp
